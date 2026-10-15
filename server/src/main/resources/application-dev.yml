@@ -1,0 +1,53 @@
+# ============================================================
+# dev 环境：本地开发（MySQL 127.0.0.1:3306 / Redis 127.0.0.1:6379）
+# ============================================================
+server:
+  port: ${APP_PORT:8080}
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DB:pkb}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    username: ${MYSQL_USER:pkb_app}
+    password: ${MYSQL_PASSWORD:}
+    hikari:
+      pool-name: pkb-hikari
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout: 3000
+      validation-timeout: 2000
+      # -1：启动时不校验连通性，DB 未就绪也不阻塞应用启动（/health 会如实报 DOWN）
+      initialization-fail-timeout: -1
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      # 本机 Redis 无密码，故不声明 password（避免空串触发 AUTH）；
+      # 若启用带密码的 Redis，放开下一行：
+      # password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DB:0}
+      timeout: 2000ms
+      connect-timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: 2000ms
+
+# 接口文档：仅 dev 打开
+knife4j:
+  enable: true
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+logging:
+  level:
+    com.pkb: debug

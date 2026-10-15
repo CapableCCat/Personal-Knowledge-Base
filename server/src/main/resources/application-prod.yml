@@ -1,0 +1,54 @@
+# ============================================================
+# prod 环境：局域网 / 本机自用（PKB V0.1 不做公网部署，此 profile 仅备用）
+# secrets 全部走环境变量
+# ============================================================
+server:
+  port: ${APP_PORT:8081}
+  tomcat:
+    threads:
+      max: 200
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DB:pkb}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    username: ${MYSQL_USER:pkb_app}
+    password: ${MYSQL_PASSWORD:}
+    hikari:
+      pool-name: pkb-hikari
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout: 3000
+      validation-timeout: 2000
+      initialization-fail-timeout: -1
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DB:0}
+      timeout: 2000ms
+      connect-timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: 2000ms
+
+# 不暴露错误详情与接口文档
+pkb:
+  health:
+    expose-detail: false
+
+knife4j:
+  enable: false
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    root: info
+    com.pkb: info
