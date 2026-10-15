@@ -1,0 +1,178 @@
+/* ============================================================
+ * 全局样式与主题变量（T21 视觉规范落地）
+ *
+ * 这里是**唯一换主题的地方**：--brand-primary 同时映射到 Element Plus 与 Vant。
+ *
+ * 三层配色体系（沿用 OSC 已验证的体系）：
+ *   ① 品牌主色  #3557F4  —— **用户拍板沿用**（原取自归档项目社团 Logo 主体文字；
+ *                          PKB 自身暂无 Logo，故该色是「品牌色」而非「从某张图采样」）
+ *                          用于：菜单当前项、主按钮、链接、Tab 激活态
+ *   ② 强调/动效色 #00D4FF —— 青蓝，**不来自 Logo**，是有意加的科技感点缀；
+ *                          只用于 hover 微动效、loading、进度条、图表高亮，**不进常规组件**
+ *   ③ 中性灰阶            —— 背景、文字、边框，约占 85% 面积
+ * 原则：一眼看到品牌蓝的当前项，二眼才注意到青蓝动效，三层不打架。
+ * ============================================================ */
+
+:root {
+  /* ---------------- 品牌色 ---------------- */
+  --brand-primary: #3557f4;
+  --brand-accent: #00d4ff;
+
+  /* ---------------- Element Plus 派生色 ----------------
+   * ⚠️ 必须显式覆盖这 6 个：EP 组件的 hover / border / disabled / 浅底用的是派生变量，
+   *    只改 --el-color-primary 会出现「主色变了、但 hover 还是旧蓝」的割裂。
+   *    取值口径 = EP 官方混合公式 mix(#fff, 主色, N%)：light-N 混 N×10% 白，dark-2 混 20% 黑。
+   *    （公式已用 EP 自身产物校验：主色 #409EFF 算出的 light-9 = #ECF5FF，与 EP 实际一致）
+   * 若日后改 --brand-primary，**这 6 个值必须一起重算**，否则又割裂。 */
+  --el-color-primary: var(--brand-primary);
+  --el-color-primary-light-3: #7289f7;
+  --el-color-primary-light-5: #9aabfa;
+  --el-color-primary-light-7: #c2cdfc;
+  --el-color-primary-light-8: #d7ddfd;
+  --el-color-primary-light-9: #ebeefe;
+  --el-color-primary-dark-2: #2a46c3;
+
+  /* Vant 同样以 --van-primary-color 为源派生浅色 */
+  --van-primary-color: var(--brand-primary);
+
+  /* ---------------- 圆角（四档，按用途取，不混用）----------------
+   * 常规控件 6 / 弹窗菜单 12 / 全屏容器 16 / 药丸头像 9999 */
+  --radius-control: 6px;
+  --radius-popup: 12px;
+  --radius-surface: 16px;
+  --radius-pill: 9999px;
+
+  /* 兼容别名：历史代码统一写 --brand-radius，指向「常规控件」档 */
+  --brand-radius: var(--radius-control);
+  --van-radius-md: var(--radius-control);
+
+  /* ---------------- 间距（4px 基准；组内 8 / 组间 16 / 板块间 32）---------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* 兼容别名：历史代码统一写 --brand-gap */
+  --brand-gap: var(--space-3);
+
+  /* ---------------- 动效（克制，能不动就不动）----------------
+   * 这里只定**时长与缓动**；具体动效由各组件在自己的任务点落地
+   * （菜单竖条 → T22、登录页 → T24），避免 T21 去动别的任务点的文件 */
+  --motion-page: 100ms; /* 页面切换淡入 */
+  --motion-fast: 150ms; /* hover 微动效 */
+  --motion-base: 200ms; /* 按钮等主态过渡 */
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ---------------- 阴影（非常弱；主要靠背景与边框建层级）---------------- */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-popup: 0 6px 16px rgba(0, 0, 0, 0.08);
+
+  /* ---------------- 登录页背景（T24）----------------
+   * ⚠️ 素材到位后**只改下面这一行**即可换成真背景图：
+   *      --login-bg-image: url('/login-bg.jpg');
+   *    未提供时用品牌色渐变兜底。两层顺序不能反（图在上、渐变在下）。 */
+  --login-bg-image: none;
+  --login-bg-gradient: linear-gradient(160deg, #3557f4 0%, #2238ad 45%, #0b1230 100%);
+
+  /* ---------------- 中性灰阶（约占 85% 面积）----------------
+   * 取值与全站现状一致（不改变现有观感）；抽成 token 是为了日后统一微调时只改一处 */
+  --text-primary: #303133;
+  --text-regular: #606266;
+  --text-secondary: #909399;
+  --text-placeholder: #c0c4cc;
+  --border-color: #ebeef5;
+  --border-color-light: #f0f2f5;
+  --bg-page: #f5f7fa;
+  --bg-surface: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 标题字距：越大越紧（《V1.0 收尾需求》§2.6） */
+h1 {
+  letter-spacing: -0.02em;
+}
+
+h2,
+h3 {
+  letter-spacing: -0.01em;
+}
+
+a {
+  color: var(--brand-primary);
+  text-decoration: none;
+  transition: opacity var(--motion-fast) var(--motion-ease);
+}
+
+a:hover {
+  opacity: 0.8;
+}
+
+/* 页面通用容器 */
+.page {
+  padding: var(--brand-gap);
+  /* 移动端底部留白，避免被底部导航遮住 */
+  padding-bottom: 72px;
+}
+
+.page-title {
+  margin: 0 0 var(--space-1);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.page-desc {
+  margin: 0 0 var(--space-4);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* 移动端安全区 */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .page {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Vant 表单：允许输入框收缩。
+   不加这条时，input 的默认 min-content 宽度（≈ size=20 字符）加上标签与后缀插槽
+   会撑破手机窄屏，导致整页横向溢出（表现为按钮、卡片右侧被切掉）。 */
+.van-field__control {
+  min-width: 0;
+}
+
+/* 尊重系统「减少动态效果」偏好（无障碍） */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
