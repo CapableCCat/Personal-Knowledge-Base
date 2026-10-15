@@ -1,0 +1,43 @@
+# ===== 环境变量与密钥（绝不入仓）=====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.jks
+*.p12
+
+# ===== 本地记忆（WorkBuddy，仅本机）=====
+.workbuddy/
+
+# ===== Java / Maven =====
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+*.log
+logs/
+hs_err_pid*
+replay_pid*
+
+# ===== IDE =====
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+!.vscode/extensions.json
+*.swp
+
+# ===== 前端（T3 起）=====
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+
+# ===== 操作系统 =====
+.DS_Store
+Thumbs.db
+desktop.ini
