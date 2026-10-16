@@ -150,12 +150,14 @@
 3. AI 自测只用隔离栈（后端 8090 + 预览站 5180）且当轮收掉。
 4. ✅ **目录与 git 已定型**：PKB 工作区 = `Personal-Knowledge-Base`（DSH 绑定，**不可改名**）；OSC 只读档案 = `New-Management-System`（98 提交，只 fetch 不 push）。
 5. ⚠️ **`pkb.user` 里已有 1 行真实账号**（用户本人，`18178325352`）——**任何会清空 / 改动 `user` 表的测试都不要做**，也不要再调 `/auth/init-admin`（已初始化会被拒）。
+6. ✅ **账号重置流程已实战演练通过**（2026-10-15）：删 user → 清 Redis → 引导页出现 → 恢复账号，全链路实测；
+   **解耦核心保证已证明**：删 `user` 行后四张业务表一行未动。步骤见 `README.md`「八、常见问题」，决策见 PRD 附录 **C.4**。
 
 **待用户定夺（开工前）**：
 - **Markdown 编辑器选型**：候选 `md-editor-v3`（倾向，Vue3 生态最顺）/ `Vditor` / `CodeMirror + marked`；**T7 开工前必定**（PRD 第十二章 #1）。
-- **T3 前需拍板**：PRD 第十二章 **#10**（忘记密码重置方式）、**#16**（token 有效期与失效策略）。
 - **T5 前需拍板**：PRD 第十二章 **#13**（`content_text` 去标记的具体规则 —— 当前 `ContentTextBuilder.Default` 已可用，但规则本身待定稿）。
-- 其余待拍板项见 PRD 第十二章（共 **11 项**未关闭）。
+- ✅ **T3 的开工阻塞项已全部关闭**：#3（Header key）、#10（重置方式）、**#16（token 策略：7 天 + 禁多端）** 均已拍板。
+- 其余待拍板项见 PRD 第十二章（共 **9 项**未关闭，均不阻塞 T3）。
 
 ---
 
@@ -322,7 +324,9 @@ curl.exe -s -o NUL -w "%{http_code}" --noproxy 127.0.0.1 http://127.0.0.1:9000/m
 | 数据库                 | MySQL 库 `pkb`（新建，不复用 osc）；应用账号 `pkb_app`（无 DDL 权限，建表用 root） |
 | 建表 / 种子脚本        | `server/sql/00~0x`（`01_schema.sql` 无 DROP、幂等）          |
 | 数据模型（已冻结）     | 见「一、项目基本盘」速览表 + PRD V0.1；4 表 `note/tag/note_tag/attachment`，3 铁律 |
-| 鉴权                   | Sa-Token Header **`pkb-token`**（已定，2026-10-09）；Redis 前缀 `pkb:captcha:*` / `pkb:login:fail:*`；前端 localStorage `pkb_token` / `pkb_profile`；登录守卫只判登录态 + 初始化态 |
+| 鉴权                   | Sa-Token Header **`pkb-token`**（已定，2026-10-09）；Redis 前缀 `pkb:captcha:*` / `pkb:login:fail:*`；**Sa-Token 自身 key 前缀是 `pkb-token:login:*`**（由 token-name 决定，勿混淆）；前端 localStorage `pkb_token` / `pkb_profile`；登录守卫只判登录态 + 初始化态 |
+| token 策略             | **有效期 7 天**（`sa-token.timeout: 604800`）+ **禁止多端登录**（`sa-token.is-concurrent: false`，新登录踢旧）——2026-10-15 拍板（PRD #16），T3 实施 |
+| 忘记密码               | **文档化步骤**（PRD #10 / 附录 C.4）：硬删 user 行 → 清 Redis `pkb-token:login:*` → 重走引导页；步骤见 `README.md` 八；演练已通过（2026-10-15） |
 | 单账号                 | 引导页首启建 1 账号；`constants/roles.js` 整删；强制改密删除；图形验证码保留 |
 | content_text           | 搜索专用列；md 存原文/轻量去标记，html 由 jsoup 剥标签；搜索只打 `title + content_text` |
 | 双格式                 | `note.content_format` 0=md/1=html，新建选定不可切换，默认 md；编辑器 T7 选型待定（倾向 md-editor-v3） |
