@@ -61,8 +61,8 @@
 | # | 任务点 | 覆盖 PRD | 依赖 | 状态 |
 | :--- | :--- | :--- | :--- | :--- |
 | T1 | **脚手架落地**（OSC 迁移 + 删业务 + 改名 `com.pkb` + 跑通空壳） | §1.4 / §2.2 / 附录 A | — | ✅ **已完成** |
-| T2 | 数据层（4 张业务表 + `user` 简化 + 实体 + Mapper + 建库脚本） | PRD §5 / §6 | T1 | ⬜ 未开始 |
-| T3 | 单账号登录（引导页 + Sa-Token + 图形验证码） | P-011 | T2 | ⬜ 未开始 |
+| T2 | 数据层（4 张业务表 + `user` 简化 + 实体 + Mapper + 建库脚本） | PRD §5 / §6 | T1 | ✅ **已完成** |
+| T3 | 单账号登录（引导页 + Sa-Token + 图形验证码） | P-011 | T2 | 🟡 **本轮任务** |
 | T4 | 外壳改造（菜单砍项 + 底部 3 Tab + 只留登录守卫 + `roles.js` 整删） | PRD §8.2 / §2.2 | T3 | ⬜ 未开始 |
 | T5 | 笔记 CRUD（后端，含 `content_text` 同步 / 归档 / 取回 / 置顶） | P-001 / P-005 | T2 | ⬜ 未开始 |
 | T6 | 笔记列表 + 详情（前端，drawer / 全屏页 + 复用同一份表单） | P-002 / P-003 | T5 | ⬜ 未开始 |
@@ -353,19 +353,186 @@ npm run dev
 
 ---
 
-### T2 数据层 ⬜
+### T2 数据层 ✅
 
-> 状态：**未开始**。**开工前必须先出技术方案并经用户确认**（涉及表结构，铁律 2）。
+> 状态：**已完成（2026-10-15）**。方案已于 2026-10-09 经用户确认；实测记录见「T2 实现结果」。
 
-- **覆盖**：PRD §5（数据模型）、§6（数据与字段决策）
-- **依赖**：T1
-- **范围**：4 张业务表（`note` / `tag` / `note_tag` / `attachment`）+ `user` 表简化 + 实体 + Mapper + 建库脚本（`00_init_database.sql` / `01_schema.sql`，**无 DROP、幂等**）
-- **开工前需用户拍板**（PRD 第十二章）：#4 `user` 表保留字段、#15 `tag` 唯一约束与逻辑删除共存方式
-- **技术方案**：⬜ 待开工前产出
+- **覆盖**：PRD §5（数据模型）、§6（数据与字段决策）、§5.4（待拍板的数据层细节）
+- **依赖**：T1 ✅
+- **范围**：4 张业务表的**实体 + Mapper**；`note_tag` 无逻辑删除的关联策略；`content_text` 生成器**接口**（实现归 T5）；索引口径定稿
+- **T1 已顺手完成的部分**：`pkb` 库 + `pkb_app` 账号已建；`01_schema.sql` 五张表**已在库里建好并跑通**（`pkb` 5 表 / `osc` 6 表零污染）
+
+#### T2 技术方案（⬜ 待用户确认）
+
+**① 交付物清单**
+
+| 类别 | 新增文件 | 说明 |
+| :--- | :--- | :--- |
+| 实体 | `entity/Note.java` · `entity/Tag.java` · `entity/NoteTag.java` · `entity/Attachment.java` | 4 个；`entity/User.java` 已就位不动 |
+| Mapper | `mapper/NoteMapper.java` · `mapper/TagMapper.java` · `mapper/NoteTagMapper.java` · `mapper/AttachmentMapper.java` | 4 个，均 `extends BaseMapper<T>`（`@MapperScan("com.pkb.mapper")` 已配） |
+| 常量 | `common/constant/ContentFormat.java` · `common/constant/NoteStatus.java` · `common/constant/TagType.java` | 三个枚举/常量类，消灭魔法数字 |
+| 生成器接口 | `common/ContentTextBuilder.java`（接口 + 默认实现） | `content_text` 计算的**单一收口点**；md 去标记的**具体规则归 T5** 定 |
+| 脚本 | 视决策结果微调 `sql/01_schema.sql` | 若采纳「不建 `tag.name` 唯一索引」则无需改动 |
+
+**② 关键决策（需用户拍板）**
+
+> 这 5 条是 T2 唯一需要拍板的内容；其余实现细节（字段名、注解写法）按 PRD §6 直接落地。
+
+| # | 议题 | 候选 | 我的倾向与理由 |
+| :--- | :--- | :--- | :--- |
+| **D-A** | `tag.name` 唯一约束（PRD 第十二章 **#15**） | ① 建 `UNIQUE(name, type)`　② 不建库级唯一，**应用层查重**　③ 物理删除标签 | **②**。理由：`is_deleted` 与唯一索引天然冲突 —— 逻辑删除的标签仍占用同名，之后新建同名会撞键（且 MySQL 唯一索引把 NULL 当互不相等，`is_deleted` 参与索引也救不了）。OSC 的先例（D19）是「用 `enabled=0` 停用代删、保证 `UNIQUE(type,code)` 稳定」，但 PKB 的 `tag` 没有 `enabled` 列，**且 PRD §5.1 冻结的表结构里也没有** —— 所以走应用层查重最贴合现状，且不违铁律。**副作用**：并发下理论上可建出同名标签，单账号自用可接受。 |
+| **D-B** | 搜索列是否建索引（PRD 第十二章 **#14**） | ① 给 `title`/`content_text` 建索引　② **不建**，V0.1 用 `LIKE` 全表扫 | **②**。理由：`LIKE '%kw%'` 前导通配**用不上任何索引**，建了也是白占空间；个人笔记万级数据全表扫毫秒级。**这条同时把 PRD #14「搜索实现方式」锁定为 `LIKE`**（`title LIKE ? OR content_text LIKE ?`，**不含 `content`**）。 |
+| **D-C** | `note_tag` 的实体与删除策略 | ① 建 `NoteTag` 实体 + 联合主键　② 不建实体，只用 SQL 操作 | **①**，且**关联走物理删除**。理由：`note_tag` 按 PRD §5.1 冻结的结构**没有 `is_deleted` 列**，所以关联的增删天然是物理操作（重新关联 = 再插一行，天然幂等，比逻辑删除简单）。MP 侧用 `@TableId` 标两列作联合主键 —— `insert` 可用；`deleteById` 不适用，删除一律走 `LambdaQueryWrapper`（T8 会用到）。⚠️ 需在 T8 方案中确认该组合主键写法在本版本 MP 下行为正确。 |
+| **D-D** | 是否加乐观锁（`version` 列） | ① 加　② 不加 | **②**。理由：单账号自用，PRD P-003 已明确「V0.1 不做乐观锁，冲突时后写覆盖」——若加列就改了已冻结的表结构（需你拍板）。 |
+| **D-E** | 列表摘要是否落库 | ① 加 `excerpt` 列　② 不加，查询时从 `content_text` 现算 | **②**。理由：`content_text` 已是纯文本，`LEFT(content_text, 200)` 在 SQL 里现算即可，**不引入冗余列**（冗余列就得同步，等于给自己加一个 R1 风险源）。 |
+
+**③ 索引口径定稿（`01_schema.sql` 现状与建议）**
+
+| 表 | 现有索引 | T2 结论 |
+| :--- | :--- | :--- |
+| `note` | PK + `idx_note_status_pinned_updated(status, pinned, updated_at)` + `idx_note_updated_at(updated_at)` | **保持不变**。前者精确支撑列表「按状态筛选 + `ORDER BY pinned DESC, updated_at DESC`」；后者支撑首页「最近」列 |
+| `tag` | PK + `idx_tag_type_sort(type, sort)` | **保持不变**（项目/标签各取各的 type，天然走前缀） |
+| `note_tag` | PK`(note_id, tag_id)` + `idx_note_tag_tag(tag_id)` | **保持不变**。PK 支撑「按笔记查标签」，反向索引支撑「某项目/标签下的笔记」与项目计数 |
+| `attachment` | PK + `idx_attachment_note(note_id)` | **保持不变** |
+| `user` | PK + `uk_user_phone(phone)` | **保持不变**（单账号，唯一约束保证不会建出第二个） |
+
+**④ 字段级补充（PRD §6 已定的实现落地）**
+
+- 4 张业务表**统一不带** `created_by` / `updated_by` —— 单账号下恒等于自己（沿用 D12 / D24）
+- `note` / `attachment` / `tag` 的 `created_at` 由 **MySQL DEFAULT CURRENT_TIMESTAMP** 负责；MyBatis-Plus 的 `@TableField(fill=INSERT)` 同时保留（两条路径结果一致，不冲突）
+- ⚠️ **`note.updated_at` 是业务字段**（参与排序），故**不允许**用 `ON UPDATE CURRENT_TIMESTAMP` 之外的方式改它；归档 / 取回会改动它（PRD P-005 已登记该行为待确认）
+- `note.content_format`：T5 的更新接口**必须显式拦截**该字段（铁律①）
+
+**⑤ 自测与验证（T2 交付时执行）**
+
+1. `mvn clean package -DskipTests` 通过
+2. 冒烟：起隔离栈 8090 → `/health` 仍 `code:200`（新增实体/Mapper 不应影响启动）
+3. **Mapper 可用性验证**：写一个临时验证入口或直接用 `mysql.exe` 对比 —— 用 `NoteMapper.insert` 插一条 → `SELECT` 确认落库 → **物理删除**该测试行（**不留在库里**）
+4. **逻辑删除验证**：`note` 插入后调 `deleteById` → 库里 `is_deleted=1`、`selectById` 查不到（验证 `@TableLogic` 生效）
+5. **列清单核对**：`SHOW COLUMNS FROM note;` 与 `Note.java` 字段**逐一对照**，确认无多无少（防「实体有列、库里没有」这类运行时才炸的问题）
+6. 交付后 `pkb` 库**不留测试数据**（表行数均应回到 0）
 
 #### T2 实现结果
 
-⬜ 未开始。
+> 状态：**已完成（2026-10-15）**。实测记录均为真实执行结果，非推断。
+
+**① 交付物（9 个新文件）**
+
+| 类别 | 文件 |
+| :--- | :--- |
+| 实体 | `entity/Note.java` · `entity/Tag.java` · `entity/NoteTag.java` · `entity/Attachment.java` |
+| Mapper | `mapper/NoteMapper.java` · `mapper/TagMapper.java` · `mapper/NoteTagMapper.java` · `mapper/AttachmentMapper.java` |
+| 常量 | `common/constant/ContentFormat.java` · `common/constant/NoteStatus.java` · `common/constant/TagType.java` |
+| 收口点 | `common/ContentTextBuilder.java`（接口 + `Default` 实现）+ `config/ContentTextConfig.java`（装配 Bean） |
+
+> 合计 **12 个**新文件（4 实体 + 4 Mapper + 3 常量 + 1 接口 + 1 配置）。
+
+**② 🔴 T2 实测抓出的库兼容性问题（方案里的写法是错的，已修正）**
+
+方案原写「`note_tag` 用 `@TableId` 标两列为联合主键」——**MyBatis-Plus 3.5.7 直接拒绝**：
+
+```text
+MybatisPlusException: @TableId can't more than one in Class: "com.pkb.entity.NoteTag"
+```
+
+后果很严重：**Mapper 注册失败 → 整个应用起不来**（不是运行时才炸）。
+
+**修正**：`NoteTag` 的两个字段**都不带 `@TableId`**，联合主键约束完全交给数据库的
+`PRIMARY KEY (note_id, tag_id)`。MP 启动时会打一条 WARN 且**语义与我们完全一致**：
+
+```text
+WARN DefaultSqlInjector : class com.pkb.entity.NoteTag ,Not found @TableId annotation,
+                          Cannot use Mybatis-Plus 'xxById' Method.
+```
+
+即「`xxById` 方法不可用」—— 而我们的用法本就不需要它（只用 `insert` / `selectList` / 条件 `delete`）。
+**该 WARN 是设计意图，不是待修缺陷**（已在实体与 Mapper 注释里写明）。
+
+**③ 验证证据（用临时 `T2Verifier` 跑真实数据库，验完即删）**
+
+| 验证项 | 实测输出 |
+| :--- | :--- |
+| md 去标记 | `[1a] md → 项目笔记 这是 正文，含 代码 与 链接。 列表项一 列表项二 int a = 1;`（剥掉 `#`/`**`/反引号/围栏，**保留链接文字、丢弃 URL**） |
+| html 剥标签 | `[1b] html→ 正文 加粗 第二段`（**`<script>alert(1)</script>` 内容未进搜索列**） |
+| 时间自动填充 | `[2a] createdAt=… updatedAt=…` 由 `MetaObjectHandler` 填充 |
+| **逻辑删除** | `[2c] deleteById 后 selectById = null`；`[2d] selectCount = 0`（`@TableLogic` 生效） |
+| 应用层查重口径 | `[3b] 同名同类型计数 = 1`（D26 的落地方式可行） |
+| **关联幂等** | `[3d] DuplicateKeyException` —— 重复关联被联合主键拦下 |
+| 关联物理删除 | `[3e] note_tag 剩余 = 0`（该表无 `is_deleted`，符合 D28） |
+| 附件 | `[4a] fileKey=attachments/202610/t2-verify.pdf`，`createdAt` 自动填充 |
+| **列清单逐一对照** | `note` 10 列 / `tag` 7 列 / `note_tag` 2 列 / `attachment` 8 列 / `user` 7 列 —— **五张表与实体字段全部完全一致** |
+| 清理 | `note=3, tag=1, attachment=1` 物理删除，**四表归零** |
+
+**④ 验证器自身的两个教训（已修正，记下来防重蹈）**
+
+1. **MP 的 `delete(wrapper)` 对带 `@TableLogic` 的实体也是逻辑删除**（且自动追加 `is_deleted=0`），
+   **清不掉已被逻辑删除的行** → 验证器的清理必须走**原生 SQL**。
+   （实测踩到：第二次运行时清理无效，库里留下占位行。）
+2. **验证器不要写与「上一步产物」冲突的前置断言**：第 ③ 步为测关联建的笔记尚未删除，
+   第 ④ 步却断言「note 表应为空」→ 假失败。**每步自扫门前雪**，别假设全局空表。
+
+**⑤ 顺带发现（非 T2 产出，但值得记录）**
+
+T2 验证期间发现 `pkb.user` 已有 **1 行真实数据**（`phone=18178325352`，`created_at` 早于 T2 验证）：
+
+- 密码为 **`$2a$10$` / 60 字符 BCrypt**（`BCryptPasswordEncoder` 产物，非明文）
+- 该号与归档库 `osc.user` 中是同一个号（**用户本人**）
+- **`osc.user` 仍 93 行，归档库零影响**
+
+→ **这是用户本人**在 T1 交付后自行走引导页建号并登录成功的真实记录，
+即 **P-011 的「引导页建号 → BCrypt 落库 → 登录」主链路已被真实使用验证**。
+
+#### T2 验证指引（PowerShell 5.1 友好）
+
+```powershell
+# ---------- 1. 五张表与列（T2 的核心交付：实体与库必须一一对应）----------
+$mysql = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
+& $mysql --user=root --password=root --table "--execute=USE pkb; SHOW TABLES;"
+# 期望 5 张：attachment / note / note_tag / tag / user
+
+& $mysql --user=root --password=root --table "--execute=USE pkb; SHOW COLUMNS FROM note;"
+# 期望 10 列：id, title, content, content_format, content_text, status, pinned,
+#             created_at, updated_at, is_deleted
+
+& $mysql --user=root --password=root --table "--execute=USE pkb; SHOW COLUMNS FROM note_tag;"
+# 期望 2 列：note_id, tag_id（联合主键，无 is_deleted）
+
+& $mysql --user=root --password=root --table "--execute=USE pkb; SHOW COLUMNS FROM tag;"
+& $mysql --user=root --password=root --table "--execute=USE pkb; SHOW COLUMNS FROM attachment;"
+& $mysql --user=root --password=root --table "--execute=USE pkb; SHOW COLUMNS FROM user;"
+
+# ---------- 2. 确认 note_tag 的联合主键真的建上了 ----------
+& $mysql --user=root --password=root --table "--execute=USE pkb; SHOW KEYS FROM note_tag WHERE Key_name='PRIMARY';"
+# 期望两行：note_id 与 tag_id 都是 PRIMARY
+
+# ---------- 3. 确认四张业务表干净（T2 验证数据已清）----------
+& $mysql --user=root --password=root --table "--execute=USE pkb; SELECT (SELECT COUNT(*) FROM note) AS note, (SELECT COUNT(*) FROM tag) AS tag, (SELECT COUNT(*) FROM note_tag) AS note_tag, (SELECT COUNT(*) FROM attachment) AS attachment;"
+# 期望全 0
+
+# ---------- 4. 归档库未被影响 ----------
+& $mysql --user=root --password=root --skip-column-names "--execute=SELECT CONCAT('osc.user = ', COUNT(*)) FROM osc.user;"
+# 期望 osc.user = 93
+
+# ---------- 5. 起后端（在 server\ 下）----------
+cd "F:\Project\Own Project\Personal-Knowledge-Base\server"
+Remove-Item env:SERVER__PORT -ErrorAction SilentlyContinue
+Remove-Item env:SERVER__HOST -ErrorAction SilentlyContinue
+& "E:\MAVEN\apache-maven-3.6.3\bin\mvn.cmd" package -DskipTests
+& "C:\Program Files\Java\jdk-17\bin\java.exe" -jar "target\pkb-server-1.0.0.jar"
+
+# ---------- 6. 另开窗口验接口 ----------
+Invoke-RestMethod http://127.0.0.1:8080/health | ConvertTo-Json -Depth 5
+Invoke-RestMethod http://127.0.0.1:8080/auth/init-status | ConvertTo-Json
+# 期望 initialized:true（你已经建过账号了）
+```
+
+**验收判据**：
+1. `pkb` 有 5 张表，`note` 10 列 / `tag` 7 列 / `note_tag` 2 列 / `attachment` 8 列 / `user` 7 列
+2. `note_tag` 的 `PRIMARY` 由 `note_id` + `tag_id` 两列组成
+3. 四张业务表行数全 0（T2 验证数据已物理清干净）
+4. `osc.user` 仍 93 行
+5. 后端能起、`/health` `code:200`、`/auth/init-status` 返回 `initialized:true`
+6. 启动日志里 `NoteTag` 那行 WARN 是**预期内**的（语义 = `xxById` 方法不可用，我们不用它）
 
 ---
 
@@ -585,6 +752,13 @@ npm run dev
 | D23 | **i18n 处置** | **整删**（`stores/locale.js` + `components/LocaleSwitch.vue`）；`App.vue` 改为直接写死 EP 中文 locale，不再有切换状态。PRD 未覆盖，2026-10-09 用户拍板 | T1 |
 | D24 | **`user` 表最终 7 列** | `id` / `phone`(唯一) / `password` / `status` / `created_at` / `updated_at` / `is_deleted`。**`activated_at` 一并删除** —— 它唯一用途是「首登强制改密」判定，该逻辑已整删；保留它只会是永远为当前时间或永远为 NULL 的死列 | T2 |
 | D25 | **`.env` 处置** | `server\.env` **不随迁移复制**（`.gitignore` 项），T1 时按 PKB 值重建（库 `pkb` / 账号 `pkb_app` / Header `pkb-token` / 桶 `pkb`）。⚠️ 它是**运行时覆盖 yml 默认值**的，迁移后必须单独核对，否则会静默连错库 | T1 |
+| D26 | `tag.name` 唯一约束 | **不建库级唯一索引**，改**应用层查重**（查询「同名且未逻辑删除」的标签）。理由：`is_deleted` 与唯一索引天然冲突（逻辑删除的标签仍占用同名，新建同名必撞键）；PRD 冻结的 `tag` 表没有 OSC 那种 `enabled` 停用列可用。副作用：并发下理论上可建同名，单账号可接受。**同时关闭 PRD 第十二章 #15** | T2 / T8 |
+| D27 | 搜索实现方式与索引 | **V0.1 锁定用 `LIKE`**（`title LIKE ? OR content_text LIKE ?`，**永不含 `content`**）；**不给搜索列建索引**（`LIKE '%kw%'` 前导通配用不上任何索引，万级数据全表扫为毫秒级）。`LIKE` 元字符必须转义。**同时关闭 PRD 第十二章 #14** | T2 / T10 |
+| D28 | `note_tag` 关联策略 | 建 `NoteTag` 实体（`@TableId` 标 `noteId` + `tagId` 为**联合主键**）；**关联一律物理删除**（重新关联 = 再插一行，天然幂等）。理由：该表按 PRD §5.1 冻结结构**没有 `is_deleted` 列**。⚠️ `deleteById` 不适用，删除走 `LambdaQueryWrapper`；生效性在 T8 验证 | T2 / T8 |
+| D29 | 不加乐观锁 | **不加 `version` 列**。PRD P-003 已定「V0.1 不做乐观锁，冲突时后写覆盖」；加列等于改冻结表结构。`note.updated_at` 参与排序，归档 / 取回会改动它 | T2 |
+| D30 | 不加摘要列 | **不加 `excerpt` 列**。`content_text` 已是纯文本，`LEFT(content_text, 200)` 在查询时现算；加冗余列 = 多一个同步点 = 多一个 R1 风险源 | T2 / T6 |
+| D31 | 索引口径定稿 | 五张表索引**维持 `01_schema.sql` 现状**（`note`: `(status,pinned,updated_at)` + `(updated_at)`；`tag`: `(type,sort)`；`note_tag`: PK + `(tag_id)`；`attachment`: `(note_id)`；`user`: `uk_user_phone`）。**T2 不改索引** | T2 |
+| D32 | `content_text` 生成收口 | 新增 `common/ContentTextBuilder` 接口（含默认实现），作为 `content_text` 计算的**唯一收口点**；`note` 的新增 / 更新必须经它。⚠️ **md 去标记的具体规则归 T5 定**（PRD 第十二章 #13 仍未关闭） | T2 / T5 |
 
 ---
 

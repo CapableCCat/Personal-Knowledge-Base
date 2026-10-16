@@ -134,26 +134,28 @@
 
 > **本节是「本轮做什么」的唯一出处**，每次交接由 AI 更新。
 
-**阶段：V0.1 进行中 —— T2 数据层（4 张业务表 + `user` 简化 + 实体 + Mapper）**
+**阶段：V0.1 进行中 —— T3 单账号登录（引导页 + Sa-Token + 图形验证码）**
 
 | 项目                   | 内容                                                         |
 | :--------------------- | :----------------------------------------------------------- |
-| **已完成**             | ① PRD V0.1 定稿（11 条 Must、4 表 + 3 铁律、17 项待拍板已列）；② 《开发任务点清单》初始化（T1~T12 转正 + D1~D25 决策）；③ **T1 脚手架落地已完成**（详见下）；④ 仓库结构定型：PKB = `Personal-Knowledge-Base`，OSC 只读档案 = `New-Management-System` |
-| **T1 交付要点**        | OSC 迁移 298 文件 + `.git`（98 提交）搬入 NMS；后端 156→37 个 Java 文件、包 `com.pkb`、主类 `PkbServerApplication`、`mvn package` 通过；前端 64→31 个源文件、i18n 与 `roles.js` 整删、`npm run build` 通过；建库 `pkb` + 账号 `pkb_app`（无 DDL）+ 5 张表；`/health` `code:200` 且 `/auth/init-status` 返回 `false`（证明确实连空库）；**未提交未推送** |
-| **本轮任务（下一步）** | **T2 数据层**：4 张业务表（`note` / `tag` / `note_tag` / `attachment`）+ `user`（7 列）+ 实体 + Mapper。⚠️ **开工前必须先出技术方案经用户确认**（铁律 2，涉及表结构）。建表脚本 `01_schema.sql` 已在 T1 顺手跑通，T2 要做的是**实体 / Mapper / 索引口径落定** |
-| **之后**               | T3 单账号登录 → T4 外壳改造 → T5 笔记 CRUD → T6 列表+详情 → T7 双格式编辑 → T8 项目/标签 → T9 首页工作台 → T10 搜索 → T11 附件 → T12 联调打磨（编号以《任务点清单》为准） |
+| **已完成**             | ① PRD V0.1（11 条 Must、4 表 + 3 铁律；17 项待拍板已关闭 6 项）；② 《开发任务点清单》（T1~T12 转正 + D1~D32 决策）；③ **T1 脚手架落地** ✅；④ **T2 数据层** ✅ |
+| **T1 交付要点**        | OSC 迁移 298 文件 + `.git`（98 提交）入 NMS；后端 156→37 文件、`com.pkb`、`mvn package` 通过；前端 64→31 文件、i18n 与 `roles.js` 整删、`npm run build` 通过；建库 `pkb` + `pkb_app` + 5 表；**已提交推送**（`c0455de` / `594982f` / `5e1677a`，`origin/main` 已同步） |
+| **T2 交付要点**        | 4 实体 + 4 Mapper + 3 常量 + `ContentTextBuilder` 收口 + `ContentTextConfig` 装配（共 12 文件）；**实测抓出 MP 3.5.7 不支持多 `@TableId`**（`note_tag` 改为不声明主键、约束交给库）；验证器跑通 md 去标记 / html 剥标签 / 逻辑删除 / 关联幂等 / **五表列清单逐一一致**；四张业务表已清空；**未提交** |
+| **本轮任务（下一步）** | **T3 单账号登录**。⚠️ **开工前必须先出技术方案经用户确认**（铁律 2，涉及鉴权公共抽象）。⚠️ 注意：**P-011 主链路已被用户真实使用验证**（`pkb.user` 有 1 行真实数据、BCrypt 落库、登录成功）—— T1 改写的 `AuthServiceImpl` 是干活的，T3 更多是**补齐与收紧**（前端守卫、失败锁定实测、登出、忘记密码口径），而非从零搭 |
+| **之后**               | T4 外壳改造 → T5 笔记 CRUD → T6 列表+详情 → T7 双格式编辑 → T8 项目/标签 → T9 首页工作台 → T10 搜索 → T11 附件 → T12 联调打磨（编号以《任务点清单》为准） |
 
 **开工前必做（环境）** —— 完整清单与命令看「八、启动清单与常用命令」，这里只留要点：
 1. MySQL / Redis 是 AUTO_START 服务（开机自启，不用管）；只有 MinIO 需手动起。
 2. 常驻服务（MinIO / 后端 / 前端）由用户在会话外手动起，AI 不用会话内后台任务起它们（避免唤醒旧会话，见 §四）。
 3. AI 自测只用隔离栈（后端 8090 + 预览站 5180）且当轮收掉。
-4. ✅ **目录与 git 已定型**（2026-10-09）：PKB 工作区 = `Personal-Knowledge-Base`（DSH 绑定，**不可改名**）；OSC 只读档案 = `New-Management-System`（98 提交，只 fetch 不 push）。PKB 侧 `git init` 已完成、**零提交**，远端指向 `CapableCCat/Personal-Knowledge-Base.git`。
+4. ✅ **目录与 git 已定型**：PKB 工作区 = `Personal-Knowledge-Base`（DSH 绑定，**不可改名**）；OSC 只读档案 = `New-Management-System`（98 提交，只 fetch 不 push）。
+5. ⚠️ **`pkb.user` 里已有 1 行真实账号**（用户本人，`18178325352`）——**任何会清空 / 改动 `user` 表的测试都不要做**，也不要再调 `/auth/init-admin`（已初始化会被拒）。
 
 **待用户定夺（开工前）**：
 - **Markdown 编辑器选型**：候选 `md-editor-v3`（倾向，Vue3 生态最顺）/ `Vditor` / `CodeMirror + marked`；**T7 开工前必定**（PRD 第十二章 #1）。
-- **T2 前需拍板**：PRD 第十二章 **#15**（`tag.name` 唯一约束与逻辑删除如何共存）。
-- **T5 前需拍板**：PRD 第十二章 **#13**（`content_text` 去标记的具体规则）。
-- 其余待拍板项见 PRD 第十二章（共 13 项未关闭）。
+- **T3 前需拍板**：PRD 第十二章 **#10**（忘记密码重置方式）、**#16**（token 有效期与失效策略）。
+- **T5 前需拍板**：PRD 第十二章 **#13**（`content_text` 去标记的具体规则 —— 当前 `ContentTextBuilder.Default` 已可用，但规则本身待定稿）。
+- 其余待拍板项见 PRD 第十二章（共 **11 项**未关闭）。
 
 ---
 
@@ -209,6 +211,30 @@ curl.exe -s -o NUL -w "%{http_code}" --noproxy 127.0.0.1 http://127.0.0.1:9000/m
   改 `ResultCode` 后必须 `grep` 全项目引用（编译一次是最快的发现手段）。
 - ⚠️ **注释里的历史词汇也是残留**：删完代码后，`grep 公告|头像|社团|报名` 仍会命中保留工具类的注释
   （`HtmlSanitizer` / `ImageValidator` / `MinioSupport`）。**注释会误导后来者以为还有那块业务**，一并改掉。
+
+### T2 实测回填的坑（2026-10-15）
+
+- 🔴 **MyBatis-Plus 3.5.7 不允许一个实体有多个 `@TableId`** —— 最响的一条。
+  给 `note_tag` 的两个字段都标 `@TableId` 想表达联合主键，结果是
+  `MybatisPlusException: @TableId can't more than one in Class`，
+  而且**发生在 Mapper 注册阶段 → 整个应用起不来**（不是运行时才炸）。
+  - **正解**：MP 没有开箱的复合主键支持，**两个字段都不标 `@TableId`**，
+    联合主键约束交给数据库 `PRIMARY KEY (note_id, tag_id)`；重复插入撞主键恰好提供了幂等性。
+  - MP 会打一条 WARN：`Not found @TableId annotation, Cannot use Mybatis-Plus 'xxById' Method.`
+    —— **这是设计意图不是缺陷**；代价是 `deleteById` / `updateById` 不可用，
+    这类表一律用条件 `delete`（`LambdaQueryWrapper`）。
+- ⚠️ **MP 的 `delete(wrapper)` 对带 `@TableLogic` 的实体也是「逻辑删除」**，且自动追加 `is_deleted = 0`：
+  它**清不掉已经被逻辑删除的行**。测试 / 验证脚本要真正清库必须走**原生 SQL**
+  （T2 实测踩到：清理无效，库里留下永久占位行，导致下次运行前置断言失败）。
+- ⚠️ **验证脚本别写与「上一步产物」冲突的前置断言**：T2 验证器第 ③ 步为测关联建的笔记尚未删除，
+  第 ④ 步却断言「note 表应为空」→ 假失败。**每步自扫门前雪**，不要假设全局空表。
+- ✅ **可复用手法：临时 `ApplicationRunner` + 专用 profile 验数据层**
+  写一个 `@Component @Profile("t2verify")` 的 `ApplicationRunner`，跑真实库做断言、打印结果、
+  自己清理、`System.exit(0)`；跑法 `java -jar … --spring.profiles.active=dev,t2verify`。
+  **验完把文件删掉**（不留生产代码）。比写单测快，且验的是真实数据库行为（这次就靠它抓到了多 `@TableId`）。
+  - 两个注意：① 控制台中文会乱码 → 加 `-Dfile.encoding=UTF-8`；② 断言失败要打异常栈，别只打一句话。
+- ⚠️ **`pkb.user` 里已有真实账号**（用户本人 `18178325352`，BCrypt `$2a$10$`）：
+  任何测试都不要清空 / 改动 `user` 表，也不要再调 `/auth/init-admin`（会因已初始化被拒）。
 
 ---
 
