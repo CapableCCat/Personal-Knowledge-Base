@@ -171,14 +171,28 @@ public class HtmlSanitizer {
     }
 
     public String toSummary(String rawHtml, int maxLength) {
-        if (!StringUtils.hasText(rawHtml)) {
-            return "";
-        }
-        String text = Jsoup.parse(rawHtml).text().replaceAll("\\s+", " ").trim();
+        String text = toPlainText(rawHtml);
         if (text.length() <= maxLength) {
             return text;
         }
         return text.substring(0, maxLength) + "…";
+    }
+
+    /**
+     * 富文本 → **纯文本全文**（剥掉所有标签、空白归一）。
+     *
+     * <p>用途：计算 {@code note.content_text}（铁律③：html 笔记的搜索列由后端剥标签得到）。
+     * 与 {@link #toSummary(String)} 的区别是**不截断**——搜索列必须包含全文。
+     *
+     * <p>⚠️ 刻意不复用 {@code toSummary(raw, Integer.MAX_VALUE)}：那样会依赖
+     * {@code text.length() <= Integer.MAX_VALUE} 恒成立才能避开 {@code substring} 分支，
+     * 语义上太脆。单独一个方法意图明确且不会误用。
+     */
+    public String toPlainText(String rawHtml) {
+        if (!StringUtils.hasText(rawHtml)) {
+            return "";
+        }
+        return Jsoup.parse(rawHtml).text().replaceAll("\\s+", " ").trim();
     }
 
     /**
