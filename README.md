@@ -180,6 +180,82 @@ Invoke-RestMethod http://127.0.0.1:8080/health   # 期望 code:200
 
 ---
 
-## 八、许可
+## 八、常见问题
+
+### 忘记密码怎么办？
+
+**决策依据**：PRD 附录 **C.4**（#10）—— 采用「文档化步骤」，不写一次性脚本、不做重置接口。
+
+**为什么可以放心删账号**：冻结的 4 张业务表（`note` / `tag` / `note_tag` / `attachment`）
+**没有任何一张带 `user_id`**，也没有指向 `user` 的外键。这是单用户系统的直接结果 ——
+**「只有一个人」让「归属」这个概念消失了**。所以：
+
+> **删除账号 ≠ 删除数据。换锁不需要搬屋子。**
+
+#### 首选路径：删账号 → 重走引导页（推荐）
+
+**三步缺一不可**，少一步就会卡住（每步的「为什么」见下方警告）：
+
+```powershell
+# ---------- 第 1 步：硬删 user 行（务必用原生 DELETE）----------
+$mysql = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
+& $mysql --user=root --password=root --table "--execute=USE pkb; SELECT id, phone FROM user;"
+# 看清要删哪一行，然后：
+& $mysql --user=root --password=root "--execute=USE pkb; DELETE FROM user WHERE id = 1;"
+# 确认已删空（期望 remain = 0）：
+& $mysql --user=root --password=root --table "--execute=USE pkb; SELECT COUNT(*) AS remain FROM user;"
+
+# ---------- 第 2 步：清掉 Redis 里的登录态 ----------
+$cli = "C:\Program Files\Redis\redis-cli.exe"
+& $cli -h 127.0.0.1 -p 6379 KEYS "pkb-token:login:*"   # 先看命中哪些
+# 逐个删（把上面列出的 key 依次填进去；通常只有 1~2 个）：
+# & $cli -h 127.0.0.1 -p 6379 DEL "pkb-token:login:token:<你的token>"
+# 或一次清掉本前缀（自用本机，风险可接受）：
+& $cli -h 127.0.0.1 -p 6379 --scan --pattern "pkb-token:login:*" | ForEach-Object { & $cli -h 127.0.0.1 -p 6379 DEL $_ }
+
+# ---------- 第 3 步 ----------
+# 刷新浏览器 → 引导页出现 → 用新手机号 / 新密码重新建号
+```
+
+> ⚠️ **第 1 步必须用原生 `DELETE`**：`user` 实体挂了 `@TableLogic`（`entity/User.java` 的 `isDeleted`），
+> 走 MyBatis-Plus 的删除只会置 `is_deleted = 1`，**行还在表里**。
+>
+> ⚠️ **第 2 步不能省**：Sa-Token 的 token 存在 Redis 里且**不查库** ——
+> 删了 `user` 行后旧 token 依然有效，浏览器看起来仍是登录态，**引导页就不会出现**。
+>
+> ⚠️ **key 前缀是 `pkb-token:login:*`，不是 `pkb:login:*`** ——
+> 前缀由 `sa-token.token-name`（= `${SA_TOKEN_NAME:pkb-token}`）决定。
+> Redis 里另有一批归档项目遗留的 `osc-token:*`（OSC 时期的会话），**不要误删**。
+
+**重置不会丢数据**：`DELETE FROM user` 之后，`note` / `tag` / `note_tag` / `attachment`
+**一行都不会动**（库里没有指向 `user` 的外键）。但**建议重置前顺手核对一下行数**，心里有底。
+
+#### 备选路径：直接改密码
+
+只在「引导页因某种原因走不通」时使用。需要自己生成 BCrypt 密文（形如 `$2a$10$...`，共 **60 字符**；
+`BCryptPasswordEncoder` **同时接受 `$2a$` 与 `$2b$`**）：
+
+```powershell
+# 用项目自带的 spring-security-crypto 生成，无需额外装工具：
+cd "F:\Project\Own Project\Personal-Knowledge-Base\server"
+# 1) 先把依赖复制到临时目录
+& "E:\MAVEN\apache-maven-3.6.3\bin\mvn.cmd" dependency:copy-dependencies "-DincludeArtifactIds=spring-security-crypto" "-DoutputDirectory=$env:TEMP\pkb-crypto"
+# 2) 用 jshell 生成（JDK 17 自带；把下面整段粘进 jshell 后回车）
+#    jshell --class-path "$env:TEMP\pkb-crypto\spring-security-crypto-6.3.5.jar"
+#    new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode("你的新密码")
+# 3) 拿到 $2a$10$... 开头的 60 字符串后：
+& "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" --user=root --password=root `
+  "--execute=USE pkb; UPDATE user SET password = '<60位的BCrypt密文>' WHERE id = 1;"
+# 4) 同样要清 Redis 登录态（第 2 步），否则旧会话仍有效
+```
+
+#### 为什么不选别的做法
+
+- ❌ **一次性脚本**：单用户系统不值得为重置密码维护常驻脚本；若做成接口还有**被误当「后门」**的风险
+- ❌ **纯直接改库（无文档）**：每次忘了都要重新摸索一遍
+
+---
+
+## 九、许可
 
 Apache License 2.0（沿用 OSC）。见 [LICENSE](LICENSE)。

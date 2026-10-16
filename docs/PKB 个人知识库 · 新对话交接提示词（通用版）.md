@@ -236,6 +236,42 @@ curl.exe -s -o NUL -w "%{http_code}" --noproxy 127.0.0.1 http://127.0.0.1:9000/m
 - ⚠️ **`pkb.user` 里已有真实账号**（用户本人 `18178325352`，BCrypt `$2a$10$`）：
   任何测试都不要清空 / 改动 `user` 表，也不要再调 `/auth/init-admin`（会因已初始化被拒）。
 
+### 账号重置的三个坑（2026-10-15 实测查明，决策见 PRD 附录 C.4 / #10）
+
+> 触发场景：忘记密码要重置、或想「删账号重走引导页」。**三步缺一不可：硬删 user 行 → 清 Redis session → 刷新。**
+
+- 🔴 **坑 1：`user` 实体挂了 `@TableLogic`，删除会变成软删。**
+  `entity/User.java` 的 `isDeleted` 上有 `@TableLogic` → `removeById()` / `deleteById()` 执行的是
+  `UPDATE user SET is_deleted = 1`，**行还在表里**。所以重置必须用**原生 SQL**：
+  ```sql
+  DELETE FROM user WHERE id = 1;   -- 原生硬删，不走 MyBatis-Plus
+  ```
+  - ✅ **一个反直觉的好消息**：引导页的判定条件是 `userMapper.selectCount(null)`，
+    而 MP 会**自动追加 `is_deleted = 0`** —— 所以**软删行不会卡住引导页**。
+    （「软删会让引导页永远不出现」这个担心在本项目**不成立**；但仍建议硬删，语义更干净。）
+  - 判定链：`AuthServiceImpl.initStatus()` → `userMapper.selectCount(null)` → `count > 0` 即 `initialized=true`。
+- 🔴 **坑 2：Redis 里的 Sa-Token session 不会跟着 `user` 行走 —— Sa-Token 不查库。**
+  删了 user 行，旧 token 在 Redis 里**依然有效** → 浏览器看起来仍是登录态 → **引导页不出现**，流程卡死。
+  - **实际 key 前缀（实测，不是推断）**：**`pkb-token:login:token:*`** 与 **`pkb-token:login:session:*`**。
+    前缀由 `sa-token.token-name`（= `${SA_TOKEN_NAME:pkb-token}`）决定，
+    ⚠️ **不是** `pkb:login:token:*` —— 别被「业务 key 都用 `pkb:`」的直觉带偏。
+  - 清理（先 KEYS 看命中，确认后再 DEL）：
+    ```powershell
+    $cli = "C:\Program Files\Redis\redis-cli.exe"
+    & $cli -h 127.0.0.1 -p 6379 KEYS "pkb-token:login:*"
+    ```
+  - ⚠️ **Redis 里另有大量归档项目遗留的 `osc-token:*` key**（OSC 时期的会话，无害但冗余）。
+    清理时**只删 `pkb-token:*`，不要误删 / 误以为它们是 PKB 的**。
+- ✅ **坑 3：`user` 表未简化 —— T1 已完成，无需再处理。**
+  `user` 已是 **7 列**（`id` / `phone` / `password` / `status` / `created_at` / `updated_at` / `is_deleted`）；
+  `constants/roles.js` 整删、`StpInterfaceImpl`（角色推导）已删、强制改密逻辑已删。
+  **不要再对 `user` 表做结构变更**（除非有新需求并经用户拍板）。
+
+- ⚠️ **「删除账号 ≠ 删除数据」是本项目的设计事实**：冻结的 4 张业务表**没有任何一张带 `user_id`**
+  （也没有指向 `user` 的外键），所以 `DELETE FROM user` 之后笔记 / 标签 / 附件 / 关联**一行都不会动**。
+  这是单用户系统的结果 —— **「只有一个人」让「归属」这个概念消失了**。
+  → 重置密码**不会丢数据**，可以放心走「删账号重来」。但**验证时仍必须实测核对行数不变**。
+
 ---
 
 ## 五、全局铁律
