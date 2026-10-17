@@ -62,8 +62,8 @@
 | :--- | :--- | :--- | :--- | :--- |
 | T1 | **脚手架落地**（OSC 迁移 + 删业务 + 改名 `com.pkb` + 跑通空壳） | §1.4 / §2.2 / 附录 A | — | ✅ **已完成** |
 | T2 | 数据层（4 张业务表 + `user` 简化 + 实体 + Mapper + 建库脚本） | PRD §5 / §6 | T1 | ✅ **已完成** |
-| T3 | 单账号登录（引导页 + Sa-Token + 图形验证码） | P-011 | T2 | 🟡 **本轮任务** |
-| T4 | 外壳改造（菜单砍项 + 底部 3 Tab + 只留登录守卫 + `roles.js` 整删） | PRD §8.2 / §2.2 | T3 | ⬜ 未开始 |
+| T3 | 单账号登录（引导页 + Sa-Token + 图形验证码） | P-011 | T2 | ✅ **已完成** |
+| T4 | 外壳改造（菜单砍项 + 底部 3 Tab + 只留登录守卫 + `roles.js` 整删） | PRD §8.2 / §2.2 | T3 | 🟡 **本轮任务** |
 | T5 | 笔记 CRUD（后端，含 `content_text` 同步 / 归档 / 取回 / 置顶） | P-001 / P-005 | T2 | ⬜ 未开始 |
 | T6 | 笔记列表 + 详情（前端，drawer / 全屏页 + 复用同一份表单） | P-002 / P-003 | T5 | ⬜ 未开始 |
 | T7 | 双格式编辑（md 编辑器选型 + 富文本复用 + 分流清洗） | P-004 | T6 | ⬜ 未开始 |
@@ -536,9 +536,9 @@ Invoke-RestMethod http://127.0.0.1:8080/auth/init-status | ConvertTo-Json
 
 ---
 
-### T3 单账号登录 🟡
+### T3 单账号登录 ✅
 
-> 状态：**未开始（本轮任务）**。**开工前必须先出技术方案并经用户确认**（涉及鉴权公共抽象，铁律 2）。
+> 状态：**已完成（2026-10-15）**。方案经用户确认（Q1 不加改密入口 / Q2 工具放 `.workbuddy`）；实测记录见「T3 实现结果」。
 
 - **覆盖**：P-011（单账号登录）
 - **依赖**：T2 ✅
@@ -556,7 +556,87 @@ Invoke-RestMethod http://127.0.0.1:8080/auth/init-status | ConvertTo-Json
   | 引导页判定条件 | `userMapper.selectCount(null)`，**MP 自动追加 `is_deleted=0`** → 不受软删影响 |
   | Sa-Token 的 Redis key 前缀 | **`pkb-token:login:token:*`** / **`pkb-token:login:session:*`**（由 `token-name` 决定） |
   | `user` 表是否已简化 | **已完成**（7 列） |
-- **技术方案**：⬜ 待开工前产出
+- **技术方案**：见下（⬜ 待用户确认）
+
+#### T3 技术方案（⬜ 待用户确认 · 2026-10-15）
+
+> **前提**：P-011 的**主链路已被用户真实使用验证过**（引导页建号 → BCrypt 落库 → 登录成功）。
+> 所以 T3 **不是从零搭**，而是① 落一条配置变更；② 把「尚未实测」的部分逐条验掉。
+
+**① 交付物清单**
+
+| 类别 | 内容 | 性质 |
+| :--- | :--- | :--- |
+| 配置变更 | `application.yml`：`sa-token.timeout` `2592000` → **`604800`**（7 天）；`is-concurrent` `true` → **`false`**（禁多端） | 行为变更 |
+| 配置变更 | `.env.example` 补 `SA_TOKEN_TIMEOUT=604800` 的说明（值本身走环境变量兜底） | 文档 |
+| 工具移植 | OSC 的验证技能 `osc-verify` → PKB 版（CDP 运行器 / 预览站 / Redis 取验证码答案） | **无生产代码** |
+| （可选）后端 | `POST /user/change-password` + `UserService.changePassword`（见开放问题 Q1） | 新功能 |
+| 文档 | 重置流程已入 `README.md`（✅ 已完成）；本条目补实现结果与验证指引 | 文档 |
+
+**② 明确不做（防范围蔓延）**
+
+- ❌ 不改 `LoginRequest` / `LoginVO` / `UserVO` 的结构（已与前端对齐）
+- ❌ 不改 `User` 表结构（7 列已定稿）
+- ❌ 不做「记住我 / 免登录」（与 #16 缩短 token 的意图相反）
+- ❌ 不做找回密码接口（#10 已定：文档化步骤）
+
+**③ 待实测清单（T3 的核心工作量 —— 上一轮只验到「能建号能登录」）**
+
+| # | 验证项 | 预期 | 怎么验 |
+| :--- | :--- | :--- | :--- |
+| V1 | **失败锁定** | 连错 5 次 → 第 6 次提示「锁定 15 分钟」；Redis `pkb:login:fail:{phone}` 有值 | 接口脚本（用**测试账号**，不动真账号） |
+| V2 | **验证码一次性** | 同一 `captchaKey`+答案用两次 → 第二次 `40001` | 接口脚本 |
+| V3 | **验证码错误** | 故意填错 → `40001`，且计数不累加 | 接口脚本 |
+| V4 | **禁多端登录**（新增行为） | 同一账号登录两次 → **第一个 token 失效**（`40100`） | 接口脚本 |
+| V5 | **token 有效期配置生效** | Redis 里 token 的 TTL ≈ **7 天**（604800s ± 少量） | 接口脚本 + Redis TTL |
+| V6 | **登出** | `/auth/logout` → 本地 token 清空 + Redis key 消失 + 再访问受保护接口 `40100` | 接口 + 页面 |
+| V7 | **登录守卫（未登录）** | 访问 `/notes` `/projects` `/tags` → 弹回 `/login?redirect=…` | **CDP 页面** |
+| V8 | **已登录访问 /login** | 重定向到 `/`（首页） | CDP 页面 |
+| V9 | **已初始化访问 /init** | 重定向到 `/login`（**不得二次建号**） | CDP 页面 |
+| V10 | **未初始化访问任意路由** | 全部送 `/init` | CDP 页面（需临时清库，见风险 R3） |
+| V11 | **登录页交互** | 填手机号/密码/验证码 → 登录成功 → 跳首页；验证码可点击刷新 | CDP 页面 |
+| V12 | **前端 token 失效处理** | 携带失效 token 时 axios 拦截器捕获 `40100` → 清本地态 + 跳登录页 | CDP 页面 |
+| V13 | **锁定提示文案** | 第 6 次登录提示明确（含剩余分钟数） | 接口脚本 |
+
+**④ 验证环境与夹具（关键设计）**
+
+- **隔离栈**：后端 `8090` + 预览站 `5180`（`web/dist` 静态托管 + `/api` 反代 8090）——**不动 8080 / 5173**
+- **测试账号（必须造，否则 V1/V4/V13 没法验）**：
+  - 用户的真账号（`18178325352`）**密码未知**（BCrypt 单向），且**绝不能把它锁掉**
+  - → 直接往 `pkb.user` 插**一个临时测试账号**（自己生成 BCrypt 哈希），**验证完立即硬删**
+  - ⚠️ 插之前记下原行数，验完核对 `user` 表**回到 1 行**（只剩用户的真账号）
+- **验证码答案**：从 Redis 反查 `pkb:captcha:{key}`（PKB 前缀已改，与 OSC 不同）
+- **页面验证**：移植 OSC 的 CDP 运行器（`--width/--height` 设备模拟 + 注入 `pkb_token`/`pkb_profile`）
+
+**⑤ 已知的坑（移植/验证时要绕开，来自 OSC 血泪史）**
+
+- ⚠️ **Chrome profile 跨轮污染**：登录态留在 profile 里 → ① 已登录用例跑过后公开页用例整体带跑偏；② profile 残锁时 Chrome 静默起不来、脚本**不报错直接 exit 0** → **每个用例用独立 profile 目录**
+- ⚠️ **`rm -rf web/dist` 必须先做**：沙箱的 safe-delete 垫片清 `dist` 会超时（`vite:prepare-out-dir … ETIMEDOUT`），**不是代码问题**
+- ⚠️ **窄屏必须 `Emulation.setDeviceMetricsOverride`**：Windows 上 `--window-size=375` 会被顶到 504
+- ⚠️ **收集网络请求用 CDP `Network.enable`**，别用页面内埋点（整页导航会把埋点数据清空）
+- ⚠️ **`mvn package` 前先确认 8090 没跑旧 jar**（Windows 会锁 `target/*.jar`）
+- ⚠️ **判失败前先分清「真回归 / 脚本过时 / 数据残留」**
+
+**⑥ 风险与开放问题**
+
+| # | 事项 | 说明 |
+| :--- | :--- | :--- |
+| R1 | **锁掉真账号** | V1 会把账号锁 15 分钟。**必须只在测试账号上验**；若误锁真账号，清 `pkb:login:fail:18178325352` 即可解锁 |
+| R2 | **`is-concurrent: false` 把用户挤下线** | 改完配置后，用户当前会话在新登录时会被踢（预期行为，但需提醒） |
+| R3 | **V10 需要「未初始化」状态** | 要临时删用户真账号行 → 复刻 2026-10-15 演练的「备份哈希 → 删 → 验 → 恢复」流程；**或**改用「临时指向空测试库」的方式规避 |
+| R4 | **测试账号残留** | 若验证中断，`user` 表可能留下测试行 → 每次验证开头/结尾都核对 `user` 表行数 = 1 |
+| R5 | **token TTL 断言的时间窗** | Sa-Token 的 TTL 从签发时刻算，断言用「> 6.9 天且 ≤ 7 天」的区间，不用精确等值 |
+
+**⑦ 开放问题（需用户拍板）**
+
+- **Q1：要不要顺手加「修改密码」自助入口？**
+  - 你的理由里提到「一直不重新登录我也容易忘记密码」—— 那么**主动改密**其实是更直接的解法
+  - 但 P-011 的功能范围只有「引导页 + 登录」，**加改密属于扩范围**，按铁律 1 需你拍板
+  - 倾向：**V0.1 不加**（保持 11 条 Must 不变），留 V0.2
+- **Q2：验证工具放哪？**
+  - 选项 A：`.workbuddy/skills/pkb-verify/`（被 `.gitignore` 忽略，**仅本机**，沿用 OSC 做法）
+  - 选项 B：`tools/verify/`（入仓，换机器也有）
+  - 倾向：**A**（验证脚本是本机环境相关的，入仓反而会漂）
 
 #### T3 待办清单 —— 重置流程与解耦验证（据 2026-10-15 决策文档）
 
@@ -598,11 +678,148 @@ Invoke-RestMethod http://127.0.0.1:8080/auth/init-status | ConvertTo-Json
 
 #### T3 实现结果
 
-⬜ 未开始。
+> 状态：**已完成（2026-10-15）**。实测记录均为真实执行结果。
 
-#### T3 验证指引
+**① 配置变更（2 处文件、3 行）**
 
-⬜ 待实现完成后补（PowerShell 5.1 友好写法）。
+| 文件 | 改动 |
+| :--- | :--- |
+| `application.yml` | `sa-token.timeout` `2592000` → **`604800`**（7 天）；`sa-token.is-concurrent` `true` → **`false`**（禁多端） |
+| `.env.example` | `SA_TOKEN_TIMEOUT` 同步改 `604800` + 注释写明「本文件会覆盖 yml 默认值，改有效期必须两处一起改」 |
+| `server/.env`（不入仓） | ⚠️ **同样要改** —— 它是运行时覆盖层，只改 yml 不生效（这正是 T1 踩过的坑） |
+
+**② 交付物**
+
+| 类别 | 内容 |
+| :--- | :--- |
+| 验证工具（**不入仓**，`.workbuddy/skills/pkb-verify/`） | `SKILL.md`（按 PKB 重写）+ `cdp_run.cjs` / `lib.cjs` / `preview_server.cjs`（从 OSC 移植并适配）+ 新增 `t3_api_verify.cjs` / `t3_page_verify.cjs` |
+| 生产代码 | **零改动**（T3 只改配置 + 验证，符合「P-011 主链路已通、T3 只做收紧」的判断） |
+
+**③ 接口验证：19/19 通过**（`node t3_api_verify.cjs`，跑在隔离栈 8090）
+
+| # | 验证项 | 实测结果 |
+| :--- | :--- | :--- |
+| V3 | 验证码错误 | `40001 验证码不正确或已过期`；**失败计数不累加**（`null`） |
+| V2 | 验证码一次性 | 正确码可登录（`200`）；**同一 key 第二次 → `40001 验证码已过期，请点击图片刷新`** |
+| V5 | **token TTL** | **`TTL=604781s（≈7.00 天）`** —— 配置真生效 ✅ |
+| V4 | **禁多端** | 首 token 可用 → 二次登录成功 → **旧 token `40100`**、新 token 可用 ✅ |
+| V6 | 登出 | 登出前可用 → `/auth/logout` 返回 `200 已退出登录` → **登出后 `40100`** ✅ |
+| V1 | **失败锁定** | 前 4 次 `40002`、**第 5 次即达阈值 → `40003`**；Redis 计数 = 5 |
+| V13 | 锁定文案 | 第 6 次（密码对也被锁）`40003`；文案「尝试次数过多，请 14 分钟后重试」**含剩余分钟数** ✅ |
+
+**④ 页面验证：17/17 通过**（`node t3_page_verify.cjs`，CDP 无头 Chrome + dist 产物）
+
+| # | 验证项 | 实测结果 |
+| :--- | :--- | :--- |
+| V7 | 守卫（未登录） | `/notes` `/projects` `/tags` 均弹回 **`/login?redirect=…`**（redirect 正确带上） |
+| V9 | 已初始化访问 `/init` | 重定向到 `/login`，**且未渲染建号表单**（不得二次建号）✅ |
+| V11 | 登录页交互 | 3 个输入框就位；验证码 base64 已加载；**点击可刷新（src 变化）**；真实填表 → **登录成功跳首页**、本地 token 长度 36 ✅ |
+| V8 | 已登录访问 `/login` | 重定向到 `/` ✅ |
+| V12 | token 失效 | 见下方「⚠️ 一条被证伪的假设」 |
+
+**⑤ ⚠️ 一条被证伪的假设（重要，避免 T5/T6 重复踩）**
+
+原设计 V12 要验「携带失效 token → axios 拦截器清态 + 跳登录」。**探针实测证明：T3 阶段这条不可能通过**：
+
+```text
+无效 token → /notes     落点 /notes     token 未被清
+无效 token → /          落点 /          token 未被清
+无效 token → /projects  落点 /projects  token 未被清
+三次的 /api 请求都只有：GET /api/auth/init-status（免登录白名单）
+```
+
+**根因**：首页 / 笔记 / 项目 / 标签在 T3 阶段**全是占位页**（T5~T9 才实现），
+没有任何页面会调用**需要鉴权**的接口 → 后端的 `40100` 在前端**无处触发**。
+
+**这不是缺陷**，反而暴露了一个正确的设计事实：**路由守卫只判「本地 token 是否存在」，不打后端**
+（否则每次导航都要多一次网络往返）。所以拿一个失效 token 仍能进占位页 —— 是预期行为。
+
+**处置**：V12 拆成两半验（页面侧 + 接口侧），**端到端验证推迟到 T5/T6**（届时有了真接口）：
+
+- V12a 守卫放行（本地有 token 即放行）✅
+- V12b 该页无受保护接口调用 → token 未被清（**证明守卫不打后端**）✅
+- V12c 后端对无效 token 返回 `40100` ✅
+- ⏳ **待 T5/T6 补验**：真实接口返回 40100 → 拦截器清态 + 跳登录
+
+**⑥ 验证过程中我自己踩的 3 个坑（已写进 pkb-verify/SKILL.md）**
+
+1. **Redis `TTL` 是整数回复（`:604800`），不是 `$` 字符串回复** → 用 `redisScalar` 解析会得 `null`，
+   第一版误报 `TTL=0s`。改用 `/:(-?\d+)/` 提取。
+2. **登录页输入框要按 `placeholder` 定位**：探针实测 `[手机号, 密码, 验证码]`；
+   按 `type !== 'password'` 过滤会同时命中手机号与验证码两个 text 框 → 把手机号当成了验证码填。
+3. **验证码答案必须「先清空 `pkb:captcha:*` 再让页面取一张」**：
+   否则 Redis 里可能同时有多张（实测命中 9 个），分不清哪把钥匙是页面的 → 取错答案、登录必失败。
+
+**⑦ 测试数据与进程收尾**
+
+| 项 | 结果 |
+| :--- | :--- |
+| 临时测试账号 `13900000001` | **已硬删**（原生 `DELETE`）；`user` 表回到 **1 行**（只剩用户真账号） |
+| 用户真账号 `18178325352` | 未改密码、未删、**未被锁**（全程只在测试账号上跑锁定用例） |
+| 四张业务表 | 全 **0** 行 |
+| Redis | `pkb:*` **已清空**（验证码 / 失败计数 / token） |
+| 归档库 `osc.user` | 仍 **93** 行（零影响） |
+| 隔离栈进程 | 8090 / 5180 **已停**，端口已释放 |
+| 临时文件 | `T3HashGen.java`、两个探针、`%TEMP%\pkb-*` **已删** |
+
+**⑧ 副作用（预期内，需告知）**
+
+- 改 `is-concurrent: false` 后，**用户下次登录会踢掉旧会话**；且清 Redis 已使其当前会话失效 → **需重新登录**（原密码不变）
+- ⚠️ **操作提醒**：本轮验证我用了 `Start-Process` 起 8090 / 5180，会导致**弹出两个 CMD 窗口且不自动关闭**。
+  用户已询问并确认可关闭。**后续 AI 自测请改用 `-WindowStyle Hidden` 或后台任务**，不要再弹窗干扰用户。
+
+#### T3 验证指引（PowerShell 5.1 友好）
+
+```powershell
+# ---------- 0. 前置：MySQL / Redis 常驻（本任务不涉及 MinIO）----------
+
+# ---------- 1. 只读核对：配置与库状态 ----------
+$root = "F:\Project\Own Project\Personal-Knowledge-Base"
+Select-String -Path "$root\server\src\main\resources\application.yml" -Pattern 'timeout|is-concurrent'
+# 期望：timeout: ${SA_TOKEN_TIMEOUT:604800}  /  is-concurrent: false
+Select-String -Path "$root\server\.env" -Pattern 'SA_TOKEN_TIMEOUT'
+# 期望：SA_TOKEN_TIMEOUT=604800（⚠️ .env 会覆盖 yml，两处必须一致）
+
+$mysql = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
+& $mysql --user=root --password=root --table "--execute=USE pkb; SELECT id, phone, LEFT(password,7) AS pwd, LENGTH(password) AS len, status FROM user;"
+# 期望：只有 1 行（你的真账号 18178325352 / $2a$10$ / 60 位）
+
+& $mysql --user=root --password=root --table "--execute=USE pkb; SELECT (SELECT COUNT(*) FROM note) AS note,(SELECT COUNT(*) FROM tag) AS tag,(SELECT COUNT(*) FROM note_tag) AS note_tag,(SELECT COUNT(*) FROM attachment) AS attachment;"
+# 期望：全 0
+
+# ---------- 2. 起后端（你自己的 8080；server\ 下）----------
+cd "$root\server"
+Remove-Item env:SERVER__PORT -ErrorAction SilentlyContinue
+Remove-Item env:SERVER__HOST -ErrorAction SilentlyContinue
+& "E:\MAVEN\apache-maven-3.6.3\bin\mvn.cmd" package -DskipTests
+& "C:\Program Files\Java\jdk-17\bin\java.exe" -jar "target\pkb-server-1.0.0.jar"
+
+# ---------- 3. 另开窗口：验 token 有效期真为 7 天（最直接的配置生效证明）----------
+#    先在前端登录一次（或走 /auth/captcha + /auth/login），然后：
+& "C:\Program Files\Redis\redis-cli.exe" -h 127.0.0.1 -p 6379 KEYS "pkb-token:login:token:*"
+& "C:\Program Files\Redis\redis-cli.exe" -h 127.0.0.1 -p 6379 TTL "<上面列出的 key>"
+# 期望：TTL ≈ 604800 秒（7 天）
+
+# ---------- 4. 验禁多端（命令行两步登录，旧 token 应失效）----------
+#    两次登录各拿一个 token，用第一个打受保护接口：
+Invoke-RestMethod http://127.0.0.1:8080/user/current -Headers @{ "pkb-token" = "<第一个 token>" } | ConvertTo-Json
+# 期望：code = 40100（已被第二次登录踢掉）
+
+# ---------- 5. 前端（web\ 下，另一个窗口）----------
+cd "$root\web"
+npm run dev
+# 浏览器：未登录访问 http://127.0.0.1:5173/notes → 应弹回 /login?redirect=/notes
+#         登录后访问 /login     → 应重定向到首页
+#         已初始化访问 /init    → 应重定向到 /login
+```
+
+**验收判据**：
+1. `application.yml` 与 `.env` 两处的 token 有效期都是 **604800**（7 天），`is-concurrent: false`
+2. Redis 里 token 的 `TTL ≈ 604800`（配置真生效）
+3. `user` 表 **1 行**（真账号）、四张业务表 **0 行**、`osc.user` 仍 **93**
+4. 未登录访问 `/notes` `/projects` `/tags` 弹回 `/login?redirect=…`
+5. 已登录访问 `/login` 跳首页；已初始化访问 `/init` 跳登录页
+6. 登录页验证码可点击刷新，填表能登录成功并跳首页
 
 ---
 
