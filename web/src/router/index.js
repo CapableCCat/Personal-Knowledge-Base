@@ -22,19 +22,30 @@ import { setupRouterGuard } from './guard'
  */
 const routes = [
   // ---------- 公开场景 ----------
+  // ⚠️ 每个公开页**各自**挂 PublicLayout，父路径就是页面自己的路径（子路由 path 为空）。
+  //    绝对**不能**再把它们放进一个 `path: '/'` 的父记录里 —— 那会与下面 AppShell 的
+  //    `path: '/'` 撞车：Vue Router 会取**先声明**的那个记录来匹配 `/`，
+  //    于是 `/` 渲染成「PublicLayout + 空 router-view」= 有页头页脚但内容全空。
+  //    （2026-10-17 用户截图抓到的真实 bug，见清单 §4 T4 实现结果 ⑥。）
   {
-    path: '/',
+    path: '/login',
     component: () => import('@/layouts/PublicLayout.vue'),
     children: [
       {
-        path: 'login',
+        path: '',
         name: 'login',
         component: () => import('@/views/auth/LoginView.vue'),
         // bare：登录页全屏背景 + 表单居中，故不显示页头页脚、内容不限宽
         meta: { title: '登录', public: true, bare: true, task: 'T3' }
-      },
+      }
+    ]
+  },
+  {
+    path: '/init',
+    component: () => import('@/layouts/PublicLayout.vue'),
+    children: [
       {
-        path: 'init',
+        path: '',
         name: 'initAdmin',
         component: () => import('@/views/auth/InitAdminView.vue'),
         meta: { title: '初始化', public: true, bare: true, task: 'T3' }

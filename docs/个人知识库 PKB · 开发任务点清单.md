@@ -63,8 +63,8 @@
 | T1 | **脚手架落地**（OSC 迁移 + 删业务 + 改名 `com.pkb` + 跑通空壳） | §1.4 / §2.2 / 附录 A | — | ✅ **已完成** |
 | T2 | 数据层（4 张业务表 + `user` 简化 + 实体 + Mapper + 建库脚本） | PRD §5 / §6 | T1 | ✅ **已完成** |
 | T3 | 单账号登录（引导页 + Sa-Token + 图形验证码） | P-011 | T2 | ✅ **已完成** |
-| T4 | 外壳改造（菜单砍项 + 底部 3 Tab + 只留登录守卫 + `roles.js` 整删） | PRD §8.2 / §2.2 | T3 | 🟡 **本轮任务** |
-| T5 | 笔记 CRUD（后端，含 `content_text` 同步 / 归档 / 取回 / 置顶） | P-001 / P-005 | T2 | ⬜ 未开始 |
+| T4 | 外壳改造（菜单砍项 + 底部 3 Tab + 只留登录守卫 + `roles.js` 整删） | PRD §8.2 / §2.2 | T3 | ✅ **已完成** |
+| T5 | 笔记 CRUD（后端，含 `content_text` 同步 / 归档 / 取回 / 置顶） | P-001 / P-005 | T2 | 🟡 **本轮任务** |
 | T6 | 笔记列表 + 详情（前端，drawer / 全屏页 + 复用同一份表单） | P-002 / P-003 | T5 | ⬜ 未开始 |
 | T7 | 双格式编辑（md 编辑器选型 + 富文本复用 + 分流清洗） | P-004 | T6 | ⬜ 未开始 |
 | T8 | 项目 / 标签（CRUD + 关联 + **项目单选后端兜底** + 计数） | P-006 / P-007 | T5 | ⬜ 未开始 |
@@ -823,19 +823,240 @@ npm run dev
 
 ---
 
-### T4 外壳改造 ⬜
+### T4 外壳改造 ✅
 
-> 状态：**未开始**。
+> 状态：**已完成（2026-10-17）**。方案经用户确认（Q1 采纳 A：外壳去掉底栏、底部让给 T9 的内容 Tab；Q2 做反向验证）。
 
-- **覆盖**：PRD §8.2（页面地图）、§2.2（单账号原则）
-- **依赖**：T3
-- **范围**：`AppShell` 菜单砍到 3~4 项（笔记 / 项目 / 标签）、底部 3 Tab 改造、路由表重建、守卫只留登录判定
-- **开工前需用户拍板**（PRD 第十二章）：#2 品牌主色与视觉 token
-- **技术方案**：⬜ 待开工前产出
+- **覆盖**：PRD §8.2（页面地图）、§2.2（单账号原则）、D-6（滚动模型）、P-010（首页形态）
+- **依赖**：T3 ✅
+- **开工前需用户拍板**：PRD #2 品牌主色 —— ✅ 已定（沿用 OSC 品牌蓝）；**另见下方「关键决策 Q1」**
+
+#### T4 技术方案（⬜ 待用户确认 · 2026-10-17）
+
+**① 先厘清：T1 已经做掉了 T4 定义里的大部分**
+
+| 原定 T4 范围 | 实际状态 |
+| :--- | :--- |
+| 菜单砍到 3~4 项 | ✅ **T1 已完成**（首页 / 笔记 / 项目 / 标签） |
+| `constants/roles.js` 整删 | ✅ **T1 已完成** |
+| 守卫只留登录判定 | ✅ **T1 已完成**（只判「已初始化 + 已登录」），且 **T3 已实测通过** |
+| 路由表重建 | ✅ **T1 已完成**（8 条路由） |
+| **底部 3 Tab 改造** | ⬜ **T4 唯一未决项 —— 且与 PRD 有冲突，见 Q1** |
+
+→ 所以 T4 的真实工作量是：**决定底部导航归属 + 落地 + 实测三档布局与滚动模型**。
+
+**② 🔴 关键决策 Q1：手机端底部到底是什么？**
+
+**冲突点**：PRD 冻结的「手机底部 3 Tab」说的是**首页的内容 Tab**，而当前外壳的底部 tabbar 是**导航**。两者都想占底部。
+
+| 方案 | 做法 | 与 PRD 的关系 |
+| :--- | :--- | :--- |
+| **A（倾向）** | **外壳去掉底部 tabbar**，底部那个位置**留给 T9 首页的 3 Tab**；手机端导航一律走页头 ☰ 抽屉 | PRD P-010 原文「底部 3 Tab：最近 / 待整理 / 项目（**切 Tab 只换内容区**）」——**明确是内容级，不是路由级**。同一屏放两条底栏会吃掉 ~112px（375×812 屏上近 15%） |
+| B | 外壳底部保留 3 项导航（首页/笔记/项目），T9 的 3 Tab 放**内容区顶部** | 与 PRD「底部」字面冲突 |
+| C | 外壳底部 tabbar 直接做成 最近/待整理/项目 | **最危险**：切 Tab 会换路由，直接违反「只换内容区」；且 /notes /projects 页上这 3 Tab 语义不成立 |
+
+**我的建议：A**。理由三条：
+1. **PRD 原文支持**（「只换内容区」是决定性措辞）；
+2. **屏幕经济学**：375px 宽上两条底栏不可接受；
+3. **职责分离**：外壳只管布局与导航，内容 Tab 归页面 —— 与「加页面只改路由表一处」的既有约定一致。
+
+**代价（必须接受）**：手机端 /notes /projects /tags 三页**没有底部导航**，只能点 ☰。这是常见移动端做法，可接受。
+
+**③ 交付物（若采纳 A）**
+
+| 文件 | 改动 |
+| :--- | :--- |
+| `layouts/AppShell.vue` | 删 `.app-tabbar` 模板块 + 相关样式；删 `.app-main` 的 `padding-bottom: 56px` 及 `@media(min-width:768px)` 补偿（不再需要为底栏留白）；**保留** `height:100% + overflow:hidden`、`.app-body`/`.app-main` 的 `min-height:0`、紧凑档 hover 浮层、☰ 抽屉 |
+| `router/menu.js` | 删 `TABBAR_SIZE` 与 `tabbarItems`（不再有底部导航；T9 的 3 Tab 是**内容筛选**，自建，不复用菜单） |
+| `layouts/PublicLayout.vue` | 无需改动（T1 已简化：i18n 已删、文案已改 PKB）—— 仅在验证时确认登录/引导页在 375px 下正常 |
+
+**④ 不做（防越界）**
+
+- ❌ **不做**首页的顶部输入框 / 状态条 / 三列 / 3 Tab（**那是 T9**）
+- ❌ **不做**任何笔记/项目/标签的业务 UI（T5~T9）
+- ❌ **不改**路由表结构（T1 已定型：8 条）
+- ❌ **不动** `useLayoutMode` 的断点（768 / 1024 保持不变，`useIsMobile` 语义也不能动）
+
+**⑤ 待实测清单（T4 的核心工作量）**
+
+| # | 验证项 | 预期 | 手段 |
+| :--- | :--- | :--- | :--- |
+| W1 | **桌面档（1440）** | 左侧菜单完整展开（图标+文字）、**无折叠按钮**、无底部 tabbar | CDP 量 DOM + 截图 |
+| W2 | **紧凑档（900）** | 侧栏收成 64px 图标态；组标题退化为分隔线；**hover 可临时展开浮层**；点折叠可固定展开 | CDP（`Input.dispatchMouseEvent` 真 hover，**不能用 `CSS.forcePseudoState`**——它不触发 `mouseenter`） |
+| W3 | **手机档（375）** | 侧栏消失；**无底部 tabbar**（采纳 A 后）；页头 ☰ 可打开抽屉；抽屉含全部 4 项且点击可跳转 | CDP + 截图 |
+| W4 | **滚动模型（最关键）** | 注入超长内容后：① `.app-main` 能滚（`scrollHeight > clientHeight`）；② **`document.documentElement` 本身不滚**（`body`/`html` 无溢出）；③ 页头位置不变（`getBoundingClientRect().top` 固定） | CDP 注入万字符内容后量 |
+| W5 | **`min-height:0` 回归防护** | 临时移除 `.app-body` 的 `min-height:0` → 应观察到 W4 失效（证明该声明真的在起作用，不是抄来的教条） | 注入样式覆盖后对比（验完恢复） |
+| W6 | **三档横滚** | 375 / 900 / 1440 三档下 `document.documentElement.scrollWidth === innerWidth`（无横向滚动） | CDP |
+| W7 | **登录/引导页（PublicLayout）** | 375px 下不溢出、卡片居中、无页头页脚（`bare`） | CDP + 截图 |
+
+**⑥ 风险**
+
+| # | 风险 | 应对 |
+| :--- | :--- | :--- |
+| R1 | **删底部 tabbar 后手机端导航变弱** | 这是 Q1 的代价，需用户确认接受；☰ 抽屉保留全部 4 项入口 |
+| R2 | 滚动模型改动容易「看着对、实际不滚」 | W4/W5 用**测量**而不是肉眼；W5 反向验证 `min-height:0` 真有用 |
+| R3 | 紧凑档 hover 靠 `mouseenter`，CDP 假 hover 验不出 | 用 `Input.dispatchMouseEvent{type:'mouseMoved'}`（OSC 已踩过） |
+| R4 | `.app-main` 的 `padding-bottom` 删早删晚 | 与 tabbar 同一次提交删，别留半截 |
 
 #### T4 实现结果
 
-⬜ 未开始。
+> 状态：**已完成（2026-10-17）**。方案经用户确认（Q1 采纳 A / Q2 做反向验证）。
+
+**① 改动（2 个文件，生产代码）**
+
+| 文件 | 改动 |
+| :--- | :--- |
+| `layouts/AppShell.vue` | 删 `.app-tabbar` 模板块 + 4 组样式（`.app-tabbar` / `__item` / `__item.is-active` / 底部留白 media query）；删 `.app-main` 的 `padding-bottom: 56px`（不再需要为底栏留白）；**保留**滚动模型、紧凑档 hover 浮层 + 固定展开、☰ 抽屉 |
+| `router/menu.js` | 删 `TABBAR_SIZE` 常量与 `tabbarItems` 计算属性（底部导航已无；T9 的 3 Tab 是内容筛选，自建） |
+
+**② 验证：40/40 全过**（`node t4_shell_verify.cjs`，CDP + dist 产物，隔离栈 8090/5180）
+
+| 组 | 关键实测 |
+| :--- | :--- |
+| **W1 桌面 1440** | 侧栏 208px、**无折叠按钮**、**无底栏**、菜单 4 项、品牌文字可见 |
+| **W2 紧凑 900** | 侧栏 64px、文字隐藏、组标题压成 **1px** 细线；**真 hover（`Input.dispatchMouseEvent`）→ 208px 且 `position:absolute`（浮层不挤内容）**；移开收回 64px；点折叠 → 208px 且 `position:static`（固定展开留在文档流） |
+| **W3 手机 375** | 无侧栏、**无底栏**、有 ☰；无横滚；☰ 打开抽屉 → **4 项齐全（首页/笔记/项目/标签）**；点第 4 项 → `/tags` 且抽屉自动关闭 |
+| **W4 滚动模型** | 注入 3 屏长内容后 `scrollH=3029 > clientH=849`；`scrollTop=500` 真生效；**页头 top 恒为 0（固定）**；`documentElement.scrollTop=0` 且 `htmlScrollH=900=innerH`（滚动被关在 `.app-main` 里） |
+| **W5 反向验证** | 见下 ③ |
+| **W6 三档横滚** | 1440 / 900 / 375 下 `scrollWidth === innerWidth` |
+| **W7 登录页 375** | `bare` 生效（无页头页脚）、卡片宽 343 ≤ 375、无横滚 |
+
+**③ 🔴 W5 反向验证推翻了一条「继承来的传说」——这是 T4 最有价值的产出**
+
+**原本的认知**（沿自 OSC）：「`.app-body` 与 `.app-main` 的 `min-height:0` 是承重件，删了内部滚动就失效」。
+
+**实测（逐项拆开量）**：
+
+| 改法 | `.app-main` clientH | `scrollTop=400` 是否生效 | `.app-body` scrollH |
+| :--- | ---: | :---: | ---: |
+| 基线（两者都有 `min-height:0`） | 849 | ✅ | 900 |
+| 只移除 `.app-body` 的 | 849 | ✅ | 900 |
+| 只移除 `.app-main` 的 | 849 | ✅ | 900 |
+| **两者都移除** | **849** | **✅** | **900** |
+| **只移除 `overflow-y:auto`**（保留 min-height） | 849 | **❌ 0** | **3080** |
+| **移除 `overflow-y` + 两个 min-height** | **3029** | **❌ 0** | 3080 |
+
+**真实机制（三条）**：
+1. **真正的承重件是 `.app-main { overflow-y: auto }`** —— 去掉它就滚不动。
+2. 按 Flexbox 规范，**`overflow` 非 `visible` 的 flex 项，其自动最小尺寸恒为 0** → 在 `overflow:auto` 下，`min-height:0` **是冗余的**。
+3. `min-height:0` **只在 `overflow: visible` 时才起作用**（全拆后 clientH 从 849 涨到 **3029**）。
+
+**对 T9（首页三列各自滚动）的指导意义（关键）**：
+> **每一列都必须自己带 `overflow-y: auto`（或 `overflow: hidden`）。**
+> 只在嵌套容器上堆 `min-height:0`、而不给 `overflow`，**不会**产生内部滚动。
+
+→ 已同步修正交接文档 §四 与 `pkb-verify/SKILL.md` 里对应的表述，避免 T9 照着旧说法做无效功。
+
+**④ 测试数据与进程收尾**
+
+| 项 | 结果 |
+| :--- | :--- |
+| 临时测试账号 `13900000001` | **已硬删**；`user` 表 = **1 行**（用户真账号，未改未删未锁） |
+| 业务表 | 全 0 行 |
+| Redis | `pkb:*` 已清空 |
+| 归档库 | `osc.user` 仍 **93** 行 |
+| 隔离栈 | 8090 / 5180 已停，端口已释放 |
+| 临时文件 | `tmp_probe_minheight.cjs` 已删；`t4_shell_verify.cjs` 作为长期脚手架保留（`.workbuddy`，不入仓） |
+
+**⑤ 过程改进（上轮用户反馈的落实）**
+
+- 本轮起常驻进程一律 `Start-Process -WindowStyle Hidden` + 输出重定向 → **全程没有弹出任何 CMD 窗口** ✅
+
+**⑥ 🔴 用户截图抓到一个我引入的真实 bug（已修，T4 交付后追加）**
+
+**症状**（用户反馈）：打开页面后「除了一个导航栏之外整个页面空白」。
+
+**根因**：我在 T1 重建路由时留下了**两个 `path: '/'` 的记录**：
+
+| 记录 | 路径 | 子路由 |
+| :--- | :--- | :--- |
+| `PublicLayout`（**先声明**） | `/` | `login` / `init`（**没有空路径子路由**） |
+| `AppShell` | `/` | `''`（首页）等 |
+
+Vue Router 会取**先声明**的那条来匹配 `/` → `/` 命中的是 `PublicLayout`（它 meta 里**没有 `bare`**）
+→ 渲染出**页头 + 页脚 + 空 `router-view`**。用 `router.resolve('/')` 实测确认：
+修复前只返回 1 条记录（PublicLayout），**叶子路由不是 `home`**。
+
+**为什么「未登录看不到、登录后看到」**：守卫对未登录用户会把人弹到 `/login`，
+所以空白只出现在**本地有 token** 的人身上 —— 而用户此时恰好**仍留着旧 token**（见 ⑦）。
+
+**修复（2 处）**：
+1. `router/index.js`：公开页改为**每个页面各自挂 `PublicLayout`**（`path: '/login'` + 子路由 `path: ''`；
+   `path: '/init'` + 子路由 `path: ''`），父路径不再与 `/` 冲突。
+2. `router/guard.js`：引导页判定从 `to.path === '/init'` 改为 **`to.name === 'initAdmin'`** ——
+   原写法漏掉 `/init/`（带尾斜杠），实测那样会绕过重定向、仍渲染建号表单。
+
+**修复后实测（12/12 通过）**：
+`/` 的叶子路由是 `home`；已登录访问 `/` 渲染 `AppShell` + **内容 199 字符**（不再空白）、菜单 4 项、页头「首页」；
+`/login` 仍 `bare` + 登录卡片；`/init` 与 **`/init/` 均重定向 `/login`**；未登录 `/` → `/login?redirect=/`。
+
+**⑦ 用户反馈的另一件事：T3 预测的「被踢下线」没有发生**
+
+用户说「我没有像 T3 说的那样被踢出登录状态」。**这与 T3 的实现结果 ⑤ 完全一致，不是矛盾**：
+
+- 我在 T3 收尾时清了 Redis（`pkb-token:login:*`），**服务端确实已失效**；
+- 但**前端没有任何页面会调需要鉴权的接口**（占位页只调免登录的 `/auth/init-status`），
+  且**路由守卫只判「本地 token 是否存在」、不打后端** → 所以**前端永远不会发现**；
+- 结果：token 已死但界面看起来还登录着，直到将来某个页面真的调接口才暴露。
+
+→ **这是已知缺口，T3 已登记「40100 端到端验证推迟到 T5/T6」**。
+**是否需要提前修**（在守卫里加一次性 `/user/current` 校验）已提交用户决策，见 ⑧。
+
+**⑧ 「失效 token 自动登出」的处置（2026-10-17 用户拍板：维持现状 B）**
+
+| 选项 | 做法 | 代价 | 结论 |
+| :--- | :--- | :--- | :--- |
+| A | 守卫在进入内部路由时，**每个会话首次**调一次 `/user/current` 校验 token；失败则清态跳登录 | +1 次请求；约 10 行 | ❌ 不采用（本轮） |
+| **B** | 维持现状，**T5/T6 有真接口后自然暴露**（原计划） | 期间「死 token 看着像登录」会一直存在 | ✅ **用户拍板采用** |
+
+> 理由：T5 起每个页面都会调接口，这个现象会自然消失，不值得为过渡期加一次额外请求。
+> **T6 仍须补验 40100 端到端**（拦截器清态 + 跳登录），这条不因此取消。
+
+**⑨ 本轮还修掉一个移植遗留**
+
+`pkb-verify/scripts/lib.cjs` 里的默认夹具口令残留着 OSC 的 `OscTest#2026`（应为 `PkbTest#2026`），
+导致截图时出现一次 **假的「密码错误」**。已改正并加注释（该口令必须与 `SKILL.md` 的约定一致）。
+
+#### T4 验证指引（PowerShell 5.1 友好）
+
+```powershell
+$root = "F:\Project\Own Project\Personal-Knowledge-Base"
+
+# ---------- 1. 确认 tabbar 相关代码已彻底移除 ----------
+Select-String -Path "$root\web\src\layouts\AppShell.vue","$root\web\src\router\menu.js" -Pattern 'tabbarItems|TABBAR_SIZE|app-tabbar'
+# 期望：只在注释里出现（说明「为什么没有」），无实际代码/样式
+
+# ---------- 2. 确认 .app-main 不再为底栏留白 ----------
+Select-String -Path "$root\web\src\layouts\AppShell.vue" -Pattern 'padding-bottom'
+# 期望：无命中（底栏留白已删）
+
+# ---------- 3. 起后端 + 前端，肉眼验三档 ----------
+cd "$root\server"
+Remove-Item env:SERVER__PORT -ErrorAction SilentlyContinue
+Remove-Item env:SERVER__HOST -ErrorAction SilentlyContinue
+& "E:\MAVEN\apache-maven-3.6.3\bin\mvn.cmd" package -DskipTests
+& "C:\Program Files\Java\jdk-17\bin\java.exe" -jar "target\pkb-server-1.0.0.jar"
+
+cd "$root\web"
+npm run dev
+# 浏览器开 http://127.0.0.1:5173 并登录，然后：
+#   ① 窗口拉到 ≥1024：左侧菜单完整、**没有折叠按钮**、**页面底部没有导航条**
+#   ② 拉到 900：侧栏变 64px 图标；鼠标移到侧栏上 → 浮层展开 208px；移开收回
+#                 点页头 ☰ → 固定展开（这次会把内容推开）
+#   ③ 拉到 375：左侧菜单消失、**底部没有导航条**；点页面左上角 ☰ → 左侧抽屉，含首页/笔记/项目/标签 4 项
+#   ④ 在任意内部页把窗口高度压到 400px：内容区自己滚，页头不动（滚动被关在内容区）
+
+# ---------- 4. 验「底栏留白已去掉」（可选，量化）----------
+#    F12 → Console 执行：
+#    document.querySelector('.app-main').style.paddingBottom   // 期望空串或 0px
+#    getComputedStyle(document.querySelector('.app-main')).overflowY  // 期望 auto
+```
+
+**验收判据**：
+1. `AppShell.vue` / `menu.js` 里 `tabbarItems` / `app-tabbar` **只存在于注释**，无实际代码与样式
+2. `.app-main` **没有** `padding-bottom` 为底栏留白
+3. 桌面无折叠按钮、无底栏；紧凑档 hover 浮层 + 点按固定展开都正常；手机档无底栏、☰ 抽屉含 4 项
+4. 长内容页面：**内容区滚、页头不动、整页不滚**
 
 ---
 
@@ -1030,6 +1251,9 @@ npm run dev
 | D30 | 不加摘要列 | **不加 `excerpt` 列**。`content_text` 已是纯文本，`LEFT(content_text, 200)` 在查询时现算；加冗余列 = 多一个同步点 = 多一个 R1 风险源 | T2 / T6 |
 | D31 | 索引口径定稿 | 五张表索引**维持 `01_schema.sql` 现状**（`note`: `(status,pinned,updated_at)` + `(updated_at)`；`tag`: `(type,sort)`；`note_tag`: PK + `(tag_id)`；`attachment`: `(note_id)`；`user`: `uk_user_phone`）。**T2 不改索引** | T2 |
 | D32 | `content_text` 生成收口 | 新增 `common/ContentTextBuilder` 接口（含默认实现），作为 `content_text` 计算的**唯一收口点**；`note` 的新增 / 更新必须经它。⚠️ **md 去标记的具体规则归 T5 定**（PRD 第十二章 #13 仍未关闭） | T2 / T5 |
+| D33 | **手机端底部空间的归属** | **外壳不渲染底部 tabbar**；底部那个位置**留给 T9 首页的内容 Tab**（最近/待整理/项目）。手机端外壳导航走页头 ☰ 抽屉（含全部 4 项）。理由：PRD P-010 原文「切 Tab **只换内容区**」= 内容级非路由级；375×812 上两条底栏吃掉近 15% 高度。代价：手机端 `/notes` `/projects` `/tags` 无底部导航，只能点 ☰ | T4 / T9 |
+| D34 | **内部滚动机制（修正 OSC 传说）** | 实测推翻「`min-height:0` 是承重件」：① **真正的承重件是 `.app-main { overflow-y: auto }`**；② 按 Flexbox 规范，`overflow` 非 `visible` 的 flex 项自动最小尺寸恒为 0，故此时 `min-height:0` **冗余**；③ `min-height:0` **只在 `overflow: visible` 时起作用**（全拆后 clientH 849→3029）。→ **T9 三列的每一列都必须自带 `overflow-y:auto`（或 `overflow:hidden`），只堆 `min-height:0` 无效** | T4 / T9 |
+| D35 | **公开页的路由结构** | **每个公开页各自挂 `PublicLayout`**（`path: '/login'` + 子路由 `path: ''`；`path: '/init'` + 子路由 `path: ''`），**禁止**把它们放进一个 `path: '/'` 的父记录。理由：与 `AppShell` 的 `path: '/'` 撞车后，Vue Router 取先声明者 → `/` 渲染成「PublicLayout + 空 router-view」= 页头页脚 + 空白（2026-10-17 用户截图抓到的真实 bug）。另：守卫判定引导页**用路由名 `initAdmin`**，不用 `to.path === '/init'`（后者漏掉 `/init/`） | T4 |
 
 ---
 

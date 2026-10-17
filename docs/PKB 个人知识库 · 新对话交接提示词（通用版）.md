@@ -134,16 +134,17 @@
 
 > **本节是「本轮做什么」的唯一出处**，每次交接由 AI 更新。
 
-**阶段：V0.1 进行中 —— T4 外壳改造（菜单砍项 + 底部 3 Tab + 登录守卫已就位）**
+**阶段：V0.1 进行中 —— T5 笔记 CRUD（后端，含 `content_text` 同步）**
 
 | 项目                   | 内容                                                         |
 | :--------------------- | :----------------------------------------------------------- |
-| **已完成**             | ① PRD V0.1（11 条 Must、4 表 + 3 铁律；17 项待拍板已关闭 **8** 项）；② 《开发任务点清单》（T1~T12 转正 + D1~D32 决策）；③ **T1 脚手架落地** ✅；④ **T2 数据层** ✅；⑤ **T3 单账号登录** ✅ |
-| **T1 交付要点**        | OSC 迁移 298 文件 + `.git`（98 提交）入 NMS；后端 156→37 文件、`com.pkb`；前端 64→31 文件、i18n 与 `roles.js` 整删；建库 `pkb` + `pkb_app` + 5 表；已推送（`c0455de`/`594982f`/`5e1677a`） |
-| **T2 交付要点**        | 4 实体 + 4 Mapper + 3 常量 + `ContentTextBuilder` 收口（12 文件）；**实测抓出 MP 3.5.7 不支持多 `@TableId`**；五表列清单逐一一致；已推送（`691e094`/`08e8aa0`） |
-| **T3 交付要点**        | **只改配置 + 验证，生产代码零改动**：`timeout` → **604800（7 天）**、`is-concurrent` → **false（禁多端）**（yml 与 `.env` **两处**都改）；**接口 19/19 + 页面 17/17 全过**；移植出 `pkb-verify` 验证技能（不入仓）；**一条假设被证伪**：T3 阶段无页面调受保护接口 → 40100 端到端验证**推迟到 T5/T6**；测试账号已硬删、`user` 回到 1 行；**未提交** |
-| **本轮任务（下一步）** | **T4 外壳改造**：菜单砍项（已砍到 4 项）、底部 3 Tab 改造、登录守卫（**已就位并实测通过**）。⚠️ **开工前必须先出技术方案经用户确认**（铁律 2，涉及外壳公共抽象 + 滚动模型）。⚠️ **首页三列的 3 Tab 属 T9**，T4 只做外壳层 |
-| **之后**               | T5 笔记 CRUD → T6 列表+详情（**届时补验 40100 端到端**）→ T7 双格式编辑 → T8 项目/标签 → T9 首页工作台 → T10 搜索 → T11 附件 → T12 联调打磨 |
+| **已完成**             | ① PRD V0.1（11 条 Must、4 表 + 3 铁律；17 项待拍板已关闭 **8** 项）；② 《开发任务点清单》（T1~T12 转正 + D1~**D34** 决策）；③ **T1 脚手架** ✅；④ **T2 数据层** ✅；⑤ **T3 单账号登录** ✅；⑥ **T4 外壳改造** ✅（已推送） |
+| **T1 交付要点**        | OSC 迁移 298 文件 + `.git`（98 提交）入 NMS；后端 156→37 文件、`com.pkb`；前端 64→31 文件、i18n 与 `roles.js` 整删；建库 `pkb` + `pkb_app` + 5 表；推送（`c0455de`/`594982f`/`5e1677a`） |
+| **T2 交付要点**        | 4 实体 + 4 Mapper + 3 常量 + `ContentTextBuilder` 收口（12 文件）；**实测抓出 MP 3.5.7 不支持多 `@TableId`**；五表列清单逐一一致；推送（`691e094`/`08e8aa0`） |
+| **T3 交付要点**        | `timeout` → **604800（7 天）**、`is-concurrent` → **false（禁多端）**（yml 与 `.env` 两处）；接口 19/19 + 页面 17/17；移植 `pkb-verify` 技能；**40100 端到端推迟到 T5/T6**；推送（`029248b`/`77ec639`） |
+| **T4 交付要点**        | **外壳删掉底部 tabbar**（底部让给 T9 的内容 Tab，D33）、清死代码、**40/40 全过**；🔴 **反向验证推翻了「`min-height:0` 是承重件」的传说**：真正承重的是 `.app-main{overflow-y:auto}`，`min-height:0` 在 overflow:auto 下**冗余**（D34）；**未提交** |
+| **本轮任务（下一步）** | **T5 笔记 CRUD（后端）**：新增 / 更新 / 归档 / 取回 / 置顶 / 逻辑删除；**`content_text` 必须经 `ContentTextBuilder` 统一收口**（铁律③，漏同步=搜索漏数据且不报错）；`content_format` 建后**显式拦截不可改**（铁律①）。⚠️ **开工前必须先出技术方案经用户确认**（铁律 2，涉及 `content_text` 公共抽象）。⚠️ **PRD #13（md 去标记的具体规则）仍是 T5 的开工阻塞项** |
+| **之后**               | T6 列表+详情（**届时补验 40100 端到端**）→ T7 双格式编辑 → T8 项目/标签 → T9 首页工作台（**三列每列自带 `overflow-y:auto`**）→ T10 搜索 → T11 附件 → T12 联调打磨 |
 
 **开工前必做（环境）** —— 完整清单与命令看「八、启动清单与常用命令」，这里只留要点：
 1. MySQL / Redis 是 AUTO_START 服务（开机自启，不用管）；只有 MinIO 需手动起。
@@ -181,7 +182,12 @@ curl.exe -s -o NUL -w "%{http_code}" --noproxy 127.0.0.1 http://127.0.0.1:9000/m
 - ⚠️ **PowerShell 5.1 测试脚本一律纯 ASCII**：含 `\"` 的 SQL 别用 PS 字符串拼（会篡改引号），写成 `.sql` 文件再 `source`。
 - ⚠️ **页面验证用 Chrome 无头 + CDP 设备模拟**：Windows 上 `--window-size=375` 会被系统最小宽度顶成 504，必须用 `Emulation.setDeviceMetricsOverride` 才是真实移动视口。
 - ⚠️ **`el-drawer` / `el-dialog` 关闭是 `v-show`（`display:none`），元素仍在 DOM**：判「已关闭」用 `!!el.offsetParent`，别用 `!!document.querySelector('.el-drawer')`。PKB 笔记详情走 `el-drawer`（桌面），这条直接复用。
-- ⚠️ **外壳滚动模型**：`.app-shell` = `height:100% + overflow:hidden`，`.app-main` 是唯一滚动容器；**`min-height:0` 最大的坑** —— flex 子项默认 `min-height:auto`，`.app-body` 与 `.app-main` 两处都必须加，否则内部滚动失效。PKB 首页是「三列各自滚动」，嵌套更深，逐层都要加。用 `height:100%` 而非 `100dvh`。
+- ⚠️ **外壳滚动模型（T4 已实测修正，**别再照抄 OSC 的旧说法**）**：
+  - 结构：`.app-shell` = `height:100% + overflow:hidden`；`.app-main` 是唯一滚动容器；用 `height:100%` 而非 `100dvh`。
+  - 🔴 **真正的承重件是 `.app-main { overflow-y: auto }`** —— 去掉它就滚不动（实测：`scrollTop` 恒为 0，`.app-body` 的 `scrollHeight` 从 900 涨到 3080）。
+  - ⚠️ **`min-height: 0` 在 `overflow: auto` 下是冗余的**：按 Flexbox 规范，**`overflow` 非 `visible` 的 flex 项，其自动最小尺寸恒为 0**，`min-height:auto` 不起作用。实测把 `.app-body` 与 `.app-main` 的 `min-height:0` **同时删掉，内部滚动依然正常**。
+  - ⚠️ **`min-height: 0` 只在 `overflow: visible` 时才起作用**：把 `overflow-y` 与两处 `min-height:0` 全拆后，`.app-main` 的 clientH 从 849 涨到 **3029**（被内容撑高）。
+  - 📌 **对 T9 首页三列的铁律**：**每一列都必须自己带 `overflow-y: auto`（或 `overflow: hidden`）**；只在嵌套容器上堆 `min-height:0` 而不给 `overflow`，**不会**得到内部滚动。
 - ⚠️ **MinIO 启动必须显式带凭据**：`MINIO_ROOT_USER=minioadmin MINIO_ROOT_PASSWORD=minioadmin`，否则报 `Unable to validate credentials inherited from the shell environment`；别用 `| head` 起（管道一关进程被带走），重定向到日志再 `run_in_background`。
 - ⚠️ **`git commit` 与 `git push` 必须分两条命令**：命令可能被沙箱升级重试跑两遍，第二次 `git commit` 报 "nothing to commit" 返回 1 → 把 `&&` 链后面的 `git push` 短路掉，看着像提交成功其实没推。收尾一律 `git log --oneline origin/main..HEAD` 核对（空=已推）。
 
@@ -190,7 +196,7 @@ curl.exe -s -o NUL -w "%{http_code}" --noproxy 127.0.0.1 http://127.0.0.1:9000/m
 - ⚠️ **`content_text` 同步是数据一致性红线**：保存/更新 `note` 时必须同步算 `content_text`（md 存原文或轻量去标记、html 由后端 jsoup 剥标签得到）。**漏同步 = 搜索漏数据**。建议：在 Service 层统一收口（新增/更新都过同一道「写 content + 算 content_text」），别让 Mapper 直接散落写。`content_text` 建索引只覆盖 `title + content_text`。
 - ⚠️ **md 原文做搜索列会命中 markdown 标记**：`#`/`*`/`-` 等符号进 `content_text` 后，搜「项目」可能误召回含 `# 项目` 的笔记。建议落 `content_text` 时对 md 也做**轻量去标记**（剥 `#`、`*`、链接语法、代码围栏），保留纯文本；html 走 jsoup `text()`。具体规则 T5 方案里定。
 - ⚠️ **双格式编辑器的 XSS 都要过 DOMPurify**：md 经编译器渲染成 html 后、富文本存库前，两端产物都需用 `DOMPurify`（前端）或 jsoup（后端）再过一遍——md 编译器输出同样可能含注入。**唯一允许 `v-html` 渲染笔记正文的地方要加清洗，且编辑态与展示态都用清洗后内容**。
-- ⚠️ **首页三列各自滚动 + AppShell 改造**：复用 OSC 三档外壳，但底部 Tab 改为「最近 / 待整理 / 项目」、菜单砍到 3~4 项。首页三列是 grid/flex 嵌套滚动，`.app-main` 内的每一列容器也要 `min-height:0 + overflow:auto`，**逐层加**，否则只有最外层滚、列内容被裁。
+- ⚠️ **首页三列各自滚动 + AppShell 改造**：复用 OSC 三档外壳，但**外壳已不渲染底部 tabbar**（T4 / D33：底部位置留给首页的内容 Tab）。首页三列是 grid/flex 嵌套滚动，**每一列容器必须自带 `overflow-y:auto`（或 `overflow:hidden`）**——只加 `min-height:0` 无效（见上一条 T4 修正）。
 - ⚠️ **单账号 + 引导页**：首启引导创建 1 个账号，强制改密逻辑删除、`constants/roles.js` 整删、守卫只留登录守卫。`user` 表应简化为单账号（去掉 `role/department/duty` 推导），但 `@TableLogic` / Sa-Token 骨架沿用——改表结构前先确认 OSC 的 `user` 表哪些字段可删。
 - ⚠️ **`note_tag` 多对多但项目单选**：表层不限制一个 note 关联多个 `type=1` 的 tag，UI 也只给单选下拉；**后端在关联写入时要兜底**（已有关联 `type=1` 时替换而非新增），否则数据层会出现「一个笔记多个项目」的脏数据。
 - ⚠️ **附件不止图片**：PKB 附件可能是 pdf/doc/xlsx 等，`ImageValidator` 是图片专用；通用文件上传要放宽魔数校验（按扩展名 + MIME 白名单），复用 MinIO 上传通道但别硬套图片校验。
@@ -295,6 +301,25 @@ curl.exe -s -o NUL -w "%{http_code}" --noproxy 127.0.0.1 http://127.0.0.1:9000/m
   所以后端的 `40100` 在前端**无处触发**。**路由守卫只判「本地 token 是否存在」、不打后端**（正确设计）。
   → 该端到端验证**已登记推迟到 T5/T6**（详见《清单》§4 T3 实现结果 ⑤）。
 
+### T4 实测回填的坑（2026-10-17，均为真实踩到）
+
+- 🔴 **两个路由记录都写 `path: '/'` 会互相抢匹配，导致页面「有页头页脚但内容全空」。**
+  T1 重建路由时，`PublicLayout`（父路径 `/`，子路由只有 `login`/`init`）与
+  `AppShell`（父路径 `/`，子路由含 `path: ''` 首页）并列。Vue Router **取先声明的那条**匹配 `/`
+  → `/` 落到 `PublicLayout`（meta 里没有 `bare`）→ 渲染出页头 + 页脚 + **空 router-view**。
+  - **只有「本地有 token」的人看得见**：未登录时守卫会把人弹到 `/login`，所以空白不出现（极难复现）。
+  - **诊断手法**：在页面里 `const m = await import('/src/router/index.js'); m.default.resolve('/').matched`
+    —— 看**叶子路由的名字**是不是 `home`。修复前叶子不是 `home`。
+  - **正解（D35）**：公开页**每个页面各自挂 `PublicLayout`**（`path: '/login'` + 子路由 `path: ''`；
+    `path: '/init'` + 子路由 `path: ''`），父路径**不要**再写 `/`。
+- ⚠️ **守卫判断「是不是某个页面」要用路由名，不要用 `to.path` 比较**：
+  `to.path === '/init'` 漏掉 `/init/`（带尾斜杠）→ 实测那样会绕过「已初始化不可再进引导页」的重定向。
+  用 `to.name === 'initAdmin'`。
+- ⚠️ **`Start-Process` 起常驻进程必须加 `-WindowStyle Hidden`**（已在 T3 坑里记过，T4 复核有效：
+  本轮全程无弹窗）。用完主动停掉并确认端口释放。
+- ⚠️ **验证脚手架里别留 OSC 的夹具口令**：`pkb-verify/scripts/lib.cjs` 曾残留 `OscTest#2026`，
+  导致一次假的「密码错误」。PKB 的夹具口令是 **`PkbTest#2026`** / 手机号 **`13900000001`**。
+
 ---
 
 ## 五、全局铁律
@@ -352,12 +377,12 @@ curl.exe -s -o NUL -w "%{http_code}" --noproxy 127.0.0.1 http://127.0.0.1:9000/m
 | content_text           | 搜索专用列；md 存原文/轻量去标记，html 由 jsoup 剥标签；搜索只打 `title + content_text` |
 | 双格式                 | `note.content_format` 0=md/1=html，新建选定不可切换，默认 md；编辑器 T7 选型待定（倾向 md-editor-v3） |
 | 项目 = tag.type=1      | 表多对多、UI 项目单选 + 标签多选；后端关联写入兜底只留一个项目 |
-| 首页工作台             | 桌面三列（项目/最近/待整理）各自滚动 + 状态条（待整理/已归档/项目/本周+）；手机底部 3 Tab；顶部输入框回车即建 inbox |
+| 首页工作台             | 桌面三列（项目/最近/待整理）各自滚动 + 状态条（待整理/已归档/项目/本周+）；**手机底部 3 Tab（最近/待整理/项目）是「内容 Tab」由 T9 自建，外壳不占底部**（D33）；顶部输入框回车即建 inbox |
 | 复用资产               | 统一返回体+全局异常+错误码、Sa-Token 骨架、MinIO 上传+MinioSupport+ImageValidator、富文本+jsoup/DOMPurify 双清洗、Sass 变量体系+三层配色、MyBatis-Plus+@TableLogic、分页/下载/日期 utils |
-| 改造复用               | 三档外壳（菜单砍 3~4 项、底部 Tab 改最近/待整理/项目）、路由表+守卫（只留登录守卫）、引导页（首启建单账号） |
+| 改造复用               | 三档外壳（菜单已砍到 4 项、**底部 tabbar 已删**，底部归 T9）、路由表+守卫（只留登录守卫）、引导页（首启建单账号） |
 | 保留不启用             | FastExcel（`cn.idev.excel`）+ ECharts 封装：代码保留不动，未来可能用上（勿删） |
 | 直接删除（OSC 业务）   | 报名/审核/查询/短信/成员档案/反馈/公告/导入导出页面/看板页面/字典业务内容/`constants/roles.js`/飞书相关 |
-| 外壳滚动模型           | `.app-shell` = `height:100% + overflow:hidden`；`.app-body` 与 `.app-main` 的 `min-height:0` 不能删；首页三列逐层加 |
+| 外壳滚动模型           | `.app-shell` = `height:100% + overflow:hidden`；**承重件是 `.app-main { overflow-y:auto }`**（`min-height:0` 在 overflow:auto 下冗余，仅 overflow:visible 时有用）；**首页三列的每列都要自带 `overflow-y:auto`**（详见 §四 T4 修正） |
 | 富文本 XSS 清洗        | 后端 `HtmlSanitizer`（jsoup）+ 前端 `sanitizeHtml.js`（DOMPurify）；md 渲染产物同样要过 DOMPurify |
 | 视觉 token             | `styles/index.scss`（主色 `--brand-primary` + EP 派生色一起改）；图表色值单一出处 `constants/palette.js` |
 | 附件                   | MinIO bucket `pkb`；库里只存对象 key，读时拼公开前缀；通用文件校验（非图片也要支持） |

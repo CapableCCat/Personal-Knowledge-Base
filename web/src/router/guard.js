@@ -28,10 +28,12 @@ export function setupRouterGuard(router) {
     }
     if (!initialized) {
       // 未初始化：只允许待在引导页
-      return to.path === ROUTE_PATH.INIT ? true : { path: ROUTE_PATH.INIT }
+      return to.name === 'initAdmin' ? true : { path: ROUTE_PATH.INIT }
     }
-    if (to.path === ROUTE_PATH.INIT) {
+    if (to.name === 'initAdmin') {
       // 已初始化：引导页不可再进（不得二次建号）
+      // ⚠️ 用**路由名**判断而不是 `to.path === '/init'`：
+      //    后者漏掉 `/init/`（带尾斜杠）—— 实测那样会绕过重定向、仍渲染建号表单。
       return { path: ROUTE_PATH.LOGIN }
     }
 
