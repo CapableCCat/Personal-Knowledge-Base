@@ -26,13 +26,14 @@ export const MENU_GROUPS = [{ key: 'main', label: '知识库', order: 10 }]
 const FALLBACK_GROUP = { key: 'other', label: '其他', order: 999 }
 
 /**
- * 手机端底部 tabbar 取前几项。
+ * ⚠️ **没有 `tabbarItems`**（T4 移除，方案 A）。
  *
- * ⚠️ PRD P-010 冻结的是「最近 / 待整理 / 项目」三个 **Tab**（切 Tab 只换内容区），
- *    与这里的「菜单前 3 项」**不是一回事** —— 首页的 3 Tab 在 T9 由 `HomeView` 自己实现。
- *    本常量只控制外壳 tabbar 的项数。
+ * <p>外壳不再渲染底部 tabbar —— PRD P-010 冻结的「手机底部 3 Tab（最近 / 待整理 / 项目）」
+ * 是**首页的内容 Tab**（原文「切 Tab 只换内容区」= 内容级、非路由级），
+ * 由 **T9 的 `HomeView` 自建**，不复用菜单数据。
+ *
+ * <p>手机端的外壳导航走页头 ☰ 抽屉（`AppShell` 里直接用 `groups` 拍平）。
  */
-const TABBAR_SIZE = 3
 
 export function useRouteMenu() {
   const router = useRouter()
@@ -81,10 +82,5 @@ export function useRouteMenu() {
     return [...map.values()].sort((a, b) => a.order - b.order)
   })
 
-  /** 移动端底部 tabbar：取扁平列表的前 N 项 */
-  const tabbarItems = computed(() =>
-    items.value.slice(0, TABBAR_SIZE).map(({ path, label, icon }) => ({ path, label, icon }))
-  )
-
-  return { groups, items, tabbarItems }
+  return { groups, items }
 }

@@ -3,16 +3,21 @@
  * 内部场景统一外壳（PKB V0.1）
  *
  * 全部内部页面共用这一套外壳，**菜单完全由路由表生成**（`router/menu.js`）：
- *   - 桌面：左侧菜单，每项带图标
+ *   - 桌面（≥1024）：左侧菜单，每项带图标
  *   - 紧凑（768~1023）：侧栏**图标态**，鼠标移入临时展开为浮层；点折叠按钮可固定展开
- *   - 手机（<768）：隐藏侧栏，底部 tabbar（前 3 项）+ 页头 ☰ 唤出抽屉（含全部项）
+ *   - 手机（<768）：隐藏侧栏，**导航走页头 ☰ 抽屉**（含全部 4 项）
  *   - 右上角：账号区 hover 出下拉 → 退出登录
+ *
+ * ⚠️ **手机端没有底部 tabbar**（T4 拍板，方案 A）：
+ *   PRD P-010 冻结的「手机底部 3 Tab（最近 / 待整理 / 项目）」是**首页的内容 Tab**
+ *   （原文「切 Tab 只换内容区」= 内容级、非路由级），由 **T9 的 HomeView 自建**。
+ *   外壳若也占底部，375×812 的屏上会叠两条底栏（吃掉近 15% 高度）。
+ *   → **底部那个位置留给 T9**；外壳只管布局与导航。
  *
  * ⚠️ 与 OSC 的关键差异（T1 落地，见清单 §4 T1）：
  *   - **菜单从 11 项砍到 4 项**：首页 / 笔记 / 项目 / 标签
  *   - **删掉 `LocaleSwitch`（i18n）与 `AnnouncementBell`（公告）**：前者整删，后者随业务删除
- *   - **删掉 `MoreGrid` 图标宫格**：PRD P-010 冻结「手机底部 3 Tab」，不需要「更多」；
- *     4 个菜单项 → tabbar 放 3 个，第 4 项（标签）走页头 ☰ 抽屉，**没有入口丢失**
+ *   - **删掉 `MoreGrid` 图标宫格**
  *   - **账号显示改用手机号**：`user` 表已删 `name` / `avatar_url` 列（PRD 附录 C.3）
  *   - **账号下拉只剩「退出登录」**：个人中心随 OSC 业务删除（PRD §1.4 非目标）
  *
@@ -54,7 +59,7 @@ const layoutMode = useLayoutMode()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const { groups, tabbarItems } = useRouteMenu()
+const { groups } = useRouteMenu()
 
 const isMobile = computed(() => layoutMode.value === 'mobile')
 const isCompact = computed(() => layoutMode.value === 'compact')
@@ -196,21 +201,10 @@ async function onAccountCommand(command) {
       </main>
     </div>
 
-    <!-- 手机档：底部 tabbar（菜单前 3 项） -->
-    <nav v-if="isMobile" class="app-tabbar">
-      <router-link
-        v-for="item in tabbarItems"
-        :key="item.path"
-        :to="item.path"
-        class="app-tabbar__item"
-        :class="{ 'is-active': route.path === item.path }"
-      >
-        <el-icon v-if="iconOf(item.icon)" :size="18"><component :is="iconOf(item.icon)" /></el-icon>
-        <span>{{ item.label }}</span>
-      </router-link>
-    </nav>
-
-    <!-- 手机档：页头 ☰ → 全部菜单（4 项里的第 4 项走这里） -->
+    <!--
+      手机档：页头 ☰ → 全部菜单。
+      ⚠️ 底部**不放**导航（T4 拍板）：那个位置留给 T9 首页的内容 Tab（PRD P-010）。
+    -->
     <el-drawer v-model="drawerVisible" direction="ltr" size="240px" :with-header="false">
       <div class="app-drawer__brand">{{ APP_NAME }}</div>
       <el-menu :default-active="route.path" router class="app-drawer__menu" @select="onMenuSelect">
@@ -402,44 +396,10 @@ async function onAccountCommand(command) {
   /* **内容在这里滚**（顶栏与侧栏不跟着动）。min-height: 0 是关键 */
   min-height: 0;
   overflow-y: auto;
-  /* 移动端给底部 tabbar 留出位置，避免最后一行被挡住 */
-  padding-bottom: 56px;
-}
-
-@media (min-width: 768px) {
-  .app-main {
-    padding-bottom: 0;
-  }
-}
-
-.app-tabbar {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  display: flex;
-  background: var(--bg-surface);
-  border-top: 1px solid var(--border-color);
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-.app-tabbar__item {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 8px 0;
-  font-size: 12px;
-  color: var(--text-secondary);
-  background: none;
-  border: none;
-  font-family: inherit;
-}
-
-.app-tabbar__item.is-active {
-  color: var(--brand-primary);
-  font-weight: 500;
+  /*
+   * ⚠️ 这里**不再**需要为底部 tabbar 留 `padding-bottom`（T4 已移除底栏，
+   *    底部位置归 T9 首页自己的内容 Tab 管理）。若将来重新引入底栏，必须同时补回来。
+   */
 }
 
 .app-drawer__brand {
