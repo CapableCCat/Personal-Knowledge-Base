@@ -62,13 +62,15 @@ pkb:
 # 鉴权：Sa-Token（Header 模式，token 存 Redis，重启不掉线）
 sa-token:
   token-name: ${SA_TOKEN_NAME:pkb-token}
-  # token 有效期（秒），2592000 = 30 天
-  timeout: ${SA_TOKEN_TIMEOUT:2592000}
+  # token 有效期（秒），604800 = 7 天
+  # ⚠️ 由 30 天缩短为 7 天（2026-10-15 拍板，PRD #16）：提高安全性，
+  #    且强制周期性重登，降低「长期不登录而忘记密码」的概率
+  timeout: ${SA_TOKEN_TIMEOUT:604800}
   # 临时活跃有效期：-1 表示不限制
   active-timeout: -1
-  # 允许同一账号多端登录
-  is-concurrent: true
-  # 多端登录时不共用同一 token
+  # ⚠️ **禁止多端登录**（2026-10-15 拍板，PRD #16）：false = 同一账号新登录会踢掉旧 token
+  is-concurrent: false
+  # 多端登录时不共用同一 token（is-concurrent=false 时该项不再起作用，保留以示意）
   is-share: false
   token-style: uuid
   # 只从 Header 读取 token，不用 Cookie
