@@ -64,8 +64,8 @@
 | T2 | 数据层（4 张业务表 + `user` 简化 + 实体 + Mapper + 建库脚本） | PRD §5 / §6 | T1 | ✅ **已完成** |
 | T3 | 单账号登录（引导页 + Sa-Token + 图形验证码） | P-011 | T2 | ✅ **已完成** |
 | T4 | 外壳改造（菜单砍项 + 底部 3 Tab + 只留登录守卫 + `roles.js` 整删） | PRD §8.2 / §2.2 | T3 | ✅ **已完成** |
-| T5 | 笔记 CRUD（后端，含 `content_text` 同步 / 归档 / 取回 / 置顶） | P-001 / P-005 | T2 | 🟡 **本轮任务** |
-| T6 | 笔记列表 + 详情（前端，drawer / 全屏页 + 复用同一份表单） | P-002 / P-003 | T5 | ⬜ 未开始 |
+| T5 | 笔记 CRUD（后端，含 `content_text` 同步 / 归档 / 取回 / 置顶） | P-001 / P-005 | T2 | ✅ **已完成** |
+| T6 | 笔记列表 + 详情（前端，drawer / 全屏页 + 复用同一份表单） | P-002 / P-003 | T5 | 🟡 **本轮任务** |
 | T7 | 双格式编辑（md 编辑器选型 + 富文本复用 + 分流清洗） | P-004 | T6 | ⬜ 未开始 |
 | T8 | 项目 / 标签（CRUD + 关联 + **项目单选后端兜底** + 计数） | P-006 / P-007 | T5 | ⬜ 未开始 |
 | T9 | 首页工作台（桌面三列各自滚动 + 手机 3 Tab + 状态条） | P-010 | T6 | ⬜ 未开始 |
@@ -1060,20 +1060,224 @@ npm run dev
 
 ---
 
-### T5 笔记 CRUD（后端） ⬜
+### T5 笔记 CRUD（后端） ✅
 
-> 状态：**未开始**。**开工前必须先出技术方案并经用户确认**（涉及 `content_text` 公共抽象，铁律 2）。
+> 状态：**已完成（2026-10-17）**。#13 已拍板（方案 A）；实测记录见「T5 实现结果」。
 
-- **覆盖**：P-001（快速记录）、P-005（待整理闭环）
-- **依赖**：T2
-- **范围**：笔记新增 / 更新 / 归档 / 取回 / 置顶 / 逻辑删除；**`content_text` 同步收口在 Service 层**（铁律 3）；`content_format` 建后不可更新（显式拦截）
-- **开工前需用户拍板**（PRD 第十二章）：#13 `content_text` 去标记的具体规则
+- **覆盖**：P-001（快速记录）、P-005（待整理闭环）；**含列表接口**（P-002 的后端部分 —— T6 只做前端）
+- **依赖**：T2 ✅
+- **范围**：新增 / 详情 / 列表 / 更新 / 归档 / 取回 / 置顶 / 逻辑删除；**`content_text` 收口在 Service 层**；`content_format` 建后不可改（显式拦截）
 - **风险**：R1（漏同步导致搜索漏数据，且不报错）
-- **技术方案**：⬜ 待开工前产出
+
+#### T5 技术方案（✅ 已确认 · 2026-10-17）
+
+**① 接口设计（8 个端点，全部需登录，不在白名单）**
+
+| 方法 | 路径 | 说明 |
+| :--- | :--- | :--- |
+| POST | `/note` | 新建。默认 `status=0`（inbox）、`pinned=0`、`content_format=0`（md） |
+| GET | `/note/{id}` | 详情（**含全文** `content`） |
+| GET | `/note/page` | 列表：分页 + `status` 筛选；**不返回正文**，只返回摘要 |
+| PUT | `/note/{id}` | 更新 `title` / `content` / `pinned`；**`contentFormat` 只允许与现值相同** |
+| POST | `/note/{id}/archive` | 归档（`status=1`，**幂等**） |
+| POST | `/note/{id}/unarchive` | 取回（`status=0`，幂等） |
+| PUT | `/note/{id}/pinned` | 置顶开关，body `{pinned:0|1}` |
+| DELETE | `/note/{id}` | **逻辑删除**（`@TableLogic` → `is_deleted=1`） |
+
+**② #13 已拍板：md 去标记采用方案 A**（用户 2026-10-17 选定）
+
+规则（即当前 `ContentTextBuilder.Default` 的行为，**本轮定稿**）：
+剥 `#{1,6}` 标题标记、`>` 引用、`-`/`*`/`+` 无序列表、`1.` 有序列表、`**`/`*`/`_`/`~~`/反引号 行内标记；
+剥水平分割线；剥代码围栏行但**保留围栏内代码内容**；链接 `[文字](url)` **保留文字、丢弃 URL**；图片 `![alt](url)` **整体丢弃**；连续空白归一为单空格。
+
+**被否决的备选**：B（代码块内容也不进搜索列 —— 技术笔记最想搜的代码会搜不到）、C（只剥 `#` 和 `**` —— `-`/`>`/反引号 仍留在搜索列里产生噪声）。
+
+**③ 铁律落地（三条，全部要在代码里显式体现）**
+
+| 铁律 | 落地方式 |
+| :--- | :--- |
+| ③ `content_text` 同步 | 笔记的新增 / 更新**只经 Service 层一个私有方法** `applyContentText(note)` 计算（内部调 `ContentTextBuilder`）。**禁止 Mapper 层散落写**。更新时**每次都重算**（最稳，不做「内容没变就跳过」的优化） |
+| ① 格式不可切换 | `NoteUpdateRequest` 带 `contentFormat` 字段；若**非空且与现值不同** → 抛 `40000`「笔记格式创建后不可修改」。**刻意不静默忽略**（静默会让调用方以为改成功了） |
+| 排序口径 | 列表固定 `ORDER BY pinned DESC, updated_at DESC`（不在接口暴露排序参数，防漂移） |
+
+**④ 关键实现细节**
+
+- **`updated_at` 必须跟着业务变化走**：归档 / 取回 / 置顶走 `update(null, wrapper)`，**MetaObjectHandler 不会自动填充**（它只在有实体入参时生效）→ **必须在 wrapper 里显式 `.set(Note::getUpdatedAt, now)`**，否则排序会失真。
+- **列表不传正文**：用 `select(Note.class, i -> !"content".equals(i.getColumn()))` 排除 `content`；摘要取 `content_text` 前 200 字（Java 侧截断）。
+- **`title` 超长截断**到 255（PRD P-001 验收明确要求「截断存入、全文仍进 content」），截断时打 WARN 日志。
+- **标题与正文不能同时为空** → `40000`。
+- **`content_format` 只接受 0/1**，其余 `40000`。
+- **找不到 / 已逻辑删除** → `40400`（`@TableLogic` 自动过滤，天然够用）。
+- **列表分页参数**：`page ≥ 1`（默认 1）、`size` 1~100（默认 20），越界 `40000`。
+
+**⑤ 本轮不做（防越界）**
+
+- ❌ 搜索（`title + content_text`）—— **T10**
+- ❌ 项目 / 标签关联与筛选 —— **T8**
+- ❌ 附件 —— **T11**
+- ❌ 任何前端页面改动 —— **T6**
+- ❌ 40100 端到端（拦截器清态跳登录）—— 需**前端页面真的调接口**，仍归 **T6**
+
+**⑥ 待实测清单**
+
+| # | 验证项 | 预期 |
+| :--- | :--- | :--- |
+| N1 | 新建 md 笔记 | 201/200；`status=0`、`pinned=0`、`format=0`；`content_text` 已按 A 规则生成 |
+| N2 | 新建 html 笔记 | `content_text` 为剥标签后的纯文本（script 内容不进） |
+| N3 | 标题与正文都为空 | `40000` |
+| N4 | 非法 `contentFormat`（如 5） | `40000` |
+| N5 | 详情 | 返回全文 `content` |
+| N6 | 更新正文 | `content_text` **同步更新**、`updated_at` 变新 |
+| N7 | 更新时改格式 | `40000`「格式创建后不可修改」 |
+| N8 | 更新时传相同格式 | 成功（不报错） |
+| N9 | 归档 | `status=1`；**重复归档幂等**（仍成功） |
+| N10 | 取回 | `status=0` |
+| N11 | 置顶 | `pinned=1`，且**列表里排最前** |
+| N12 | 列表筛选 | `status=0` / `status=1` 各只返回对应状态 |
+| N13 | 列表排序 | 置顶优先，其次 `updated_at` 倒序 |
+| N14 | 列表**不含正文** | 响应里无 `content` 字段，只有 `excerpt` |
+| N15 | 逻辑删除 | 删后详情 `40400`、列表不再出现；库里 `is_deleted=1` 且**行仍在** |
+| N16 | 超长标题 | 入库 `title` 长度 = 255，`content` 完整 |
+| N17 | 未登录访问任一 `/note` 接口 | `40100` |
+| N18 | 分页越界（size=0 / page=0） | `40000` |
 
 #### T5 实现结果
 
-⬜ 未开始。
+> 状态：**已完成（2026-10-17）**。#13 已拍板（方案 A）；实测记录均为真实执行结果。
+
+**① 交付物（9 个新文件）**
+
+| 类别 | 文件 |
+| :--- | :--- |
+| Controller | `controller/NoteController.java`（8 个端点） |
+| Service | `service/NoteService.java` + `service/impl/NoteServiceImpl.java` |
+| DTO | `NoteCreateRequest` · `NoteUpdateRequest` · `NotePinnedRequest` · `NoteQuery` · `NoteVO` · `NoteListItemVO` |
+
+**② 实测：接口 33/33 + 落库核对 4/4 全过**
+
+接口侧（`node t5_note_verify.cjs`，隔离栈 8090）：
+
+| 组 | 关键实测 |
+| :--- | :--- |
+| 新建 | md 默认 `status=0/pinned=0/format=0`；html 新建 `format=1` |
+| 校验 | 标题正文全空 → `40000 请填写标题或正文`；格式=5 → `40000`；pinned=5 → `40000`；page=0 / size=0 / size=101 → `40000` |
+| 详情 | 返回完整 `content`（110 字符） |
+| 更新 | 正文更新成功、`updated_at` 变化；**改格式 → `40000 笔记格式创建后不可修改`**；传相同格式 → 成功 |
+| 归档闭环 | 归档 `status=1`；**重复归档幂等**；取回 `status=0` |
+| 置顶 | `pinned=1`；**列表第一项就是它**；非法值 `40000` |
+| 列表 | 排序 = `pinned DESC, updatedAt DESC`（逐条比对通过）；状态筛选 0/1 各自正确；**列表项不含 `content`**、含非空 `excerpt` |
+| 逻辑删除 | 删除后详情 `40400`、列表不再出现；**库里 `is_deleted=1` 行仍在** |
+| 超长标题 | 入库 `title` 长度 = **255**，正文完整 |
+| 未登录 | 任一 `/note` 接口 → `40100` |
+
+落库侧（`mysql` 直查）：**「有正文但 `content_text` 为空」的行数 = 0**；html 笔记 `content_text = [正文 加粗 第二段]`（**`<script>` 内容未进搜索列**）；逻辑删除行仍在库；`content_format` 建后未被改动。
+
+**③ 🔴 R1 真实踩坑（本任务最重要的产出）**
+
+**现象**：第一次跑验证，`excerpt` 是**空的** —— 差一点就当作「摘要没实现」放过去了。
+查库发现 **id 9 的 `content` 有 20 字，`content_text` 是 0 字**。
+
+**根因**：`update()` 里我用 **`patch.content`** 去算 `content_text`。
+当请求**只改标题 / 只改置顶、不带 content** 时，`patch.content` 是 `null`
+→ `build(null)` 返回 `""` → **把库里已有的 `content_text` 覆盖成空**。
+
+这正是 PRD 风险 R1 描述的场景：**搜索列静默变空，不报错，只有搜索少结果时才发现**。
+
+**修复**：用**「最终生效的内容」**算 —— 没传 content 就用库里的旧值：
+```java
+String finalContent = request.content() != null ? patch.getContent() : note.getContent();
+patch.setContentText(contentTextBuilder.build(finalContent, note.getContentFormat()));
+```
+
+**配套加了三道回归断言**（否则同类 bug 还会漏）：
+- `N6c/N6d`：只改标题后，正文**不能被清空**
+- `N14b`：列表 `excerpt` **必须非空**（原断言只查字段存在 → 会漏掉「字段在但值为空」）
+- 落库断言：「有 content 但 content_text 为空的行数 = 0」
+
+**④ 另一个坑：构建失败但验证照跑，结果验的是旧 jar**
+
+第一次重编译时报 `Failed to delete target\pkb-server-1.0.0.jar`（**旧进程占着 jar**，Windows 文件锁），
+而我的验证脚本**没检查构建退出码**就继续跑 → 拿旧 jar 验证 → 假失败，白折腾一轮。
+
+**规则**：本地验证的固定顺序必须是
+**停进程 → 构建 → 检查退出码为 0 → （可选）确认 jar 时间戳 → 起新进程 → 再验证**。
+
+**⑤ 测试数据与进程收尾**
+
+| 项 | 结果 |
+| :--- | :--- |
+| 测试账号 `13900000001` | 已硬删；`user` 表 **1 行**（用户真账号，未动） |
+| `note` / `tag` / `note_tag` / `attachment` | 全 **0** 行（含逻辑删除行已物理清理） |
+| Redis | `pkb:*` 已清空 |
+| 归档库 | `osc.user` 仍 **93** |
+| 隔离栈进程 | 8090 已停，端口已释放 |
+| 用户自己的实例 | 5173 / 8080 **全程未动** |
+
+**⑥ 遗留到 T6 的**
+
+- **40100 端到端**（前端拦截器收到 40100 → 清本地态 + 跳登录）：本任务已提供真接口，
+  但**目前没有页面调它**，仍需 T6 让 `NotesView` 真的调 `/note/page` 才能验。
+- UI 文案 / 交互：归 T6。
+
+#### T5 验证指引（PowerShell 5.1 友好）
+
+```powershell
+$root = "F:\Project\Own Project\Personal-Knowledge-Base"
+$mysql = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
+
+# ---------- 1. 只读核对：代码结构与铁律落地 ----------
+# ① content_text 的计算入口只有 Service 层（Mapper 里不应出现）
+Select-String -Path "$root\server\src\main\java\com\pkb\**\*.java" -Pattern 'contentText|ContentText' -List |
+  ForEach-Object { "  " + (Split-Path $_.Path -Leaf) }
+# 期望：只有 NoteServiceImpl / Note / ContentTextBuilder(Config) 相关文件命中
+
+# ② 格式不可改的拦截在 Service 里
+Select-String -Path "$root\server\src\main\java\com\pkb\service\impl\NoteServiceImpl.java" -Pattern '格式创建后不可修改'
+
+# ---------- 2. 起后端（⚠️ 顺序：先确认 8090 无占用，再构建）----------
+Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+cd "$root\server"
+Remove-Item env:SERVER__PORT -ErrorAction SilentlyContinue
+Remove-Item env:SERVER__HOST -ErrorAction SilentlyContinue
+& "E:\MAVEN\apache-maven-3.6.3\bin\mvn.cmd" clean package -DskipTests
+if ($LASTEXITCODE -ne 0) { throw "构建失败，先查原因（多半是旧进程占着 jar）" }
+& "C:\Program Files\Java\jdk-17\bin\java.exe" -jar "target\pkb-server-1.0.0.jar" --server.port=8090
+
+# ---------- 3. 另开窗口：手点几个关键接口（用你自己 8080 的实例也行）----------
+# 先登录拿 token（浏览器 F12 → Application → localStorage → pkb_token），然后：
+$token = "<粘贴你的 pkb_token>"
+$h = @{ "pkb-token" = $token; "Content-Type" = "application/json" }
+
+# 建一条笔记
+$body = @{ title = "T5 手验"; content = "# 标题`n`n正文 **加粗**" } | ConvertTo-Json
+$created = Invoke-RestMethod -Uri http://127.0.0.1:8080/note -Method POST -Headers $h -Body $body
+$created | ConvertTo-Json -Depth 5
+# 期望 code=200，data.status=0、pinned=0、contentFormat=0
+
+# 查它落库后的 content_text（关键：不能为空）
+& $mysql --user=root --password=root --default-character-set=utf8mb4 --table `
+  "--execute=USE pkb; SELECT id, CHAR_LENGTH(content) AS c_len, CHAR_LENGTH(content_text) AS t_len, LEFT(content_text,40) FROM note;"
+# 期望 t_len > 0
+
+# 列表（不含正文）
+Invoke-RestMethod -Uri "http://127.0.0.1:8080/note/page?page=1&size=10" -Headers $h | ConvertTo-Json -Depth 5
+# 期望 records 里没有 content 字段、excerpt 非空
+
+# 归档 → 取回 → 置顶
+Invoke-RestMethod -Uri "http://127.0.0.1:8080/note/$($created.data.id)/archive" -Method POST -Headers $h | ConvertTo-Json
+Invoke-RestMethod -Uri "http://127.0.0.1:8080/note/$($created.data.id)/unarchive" -Method POST -Headers $h | ConvertTo-Json
+
+# 手验完记得清掉（否则会占用你的真库）：
+& $mysql --user=root --password=root "--execute=USE pkb; DELETE FROM note WHERE title='T5 手验';"
+```
+
+**验收判据**：
+1. 新建笔记后，库里 `content_text` **非空**且符合方案 A 的规则（剥标记、保留代码内容、链接留文字）
+2. 只改标题（不带 content）后再查库，`content_text` **仍非空**
+3. 改 `contentFormat` 返回 `40000 笔记格式创建后不可修改`
+4. 归档/取回幂等；置顶后列表第一项是它
+5. 列表响应**没有 `content` 字段**；删除后详情 `40400` 且库里 `is_deleted=1`
 
 ---
 
@@ -1254,6 +1458,8 @@ npm run dev
 | D33 | **手机端底部空间的归属** | **外壳不渲染底部 tabbar**；底部那个位置**留给 T9 首页的内容 Tab**（最近/待整理/项目）。手机端外壳导航走页头 ☰ 抽屉（含全部 4 项）。理由：PRD P-010 原文「切 Tab **只换内容区**」= 内容级非路由级；375×812 上两条底栏吃掉近 15% 高度。代价：手机端 `/notes` `/projects` `/tags` 无底部导航，只能点 ☰ | T4 / T9 |
 | D34 | **内部滚动机制（修正 OSC 传说）** | 实测推翻「`min-height:0` 是承重件」：① **真正的承重件是 `.app-main { overflow-y: auto }`**；② 按 Flexbox 规范，`overflow` 非 `visible` 的 flex 项自动最小尺寸恒为 0，故此时 `min-height:0` **冗余**；③ `min-height:0` **只在 `overflow: visible` 时起作用**（全拆后 clientH 849→3029）。→ **T9 三列的每一列都必须自带 `overflow-y:auto`（或 `overflow:hidden`），只堆 `min-height:0` 无效** | T4 / T9 |
 | D35 | **公开页的路由结构** | **每个公开页各自挂 `PublicLayout`**（`path: '/login'` + 子路由 `path: ''`；`path: '/init'` + 子路由 `path: ''`），**禁止**把它们放进一个 `path: '/'` 的父记录。理由：与 `AppShell` 的 `path: '/'` 撞车后，Vue Router 取先声明者 → `/` 渲染成「PublicLayout + 空 router-view」= 页头页脚 + 空白（2026-10-17 用户截图抓到的真实 bug）。另：守卫判定引导页**用路由名 `initAdmin`**，不用 `to.path === '/init'`（后者漏掉 `/init/`） | T4 |
+| D36 | **更新时算 `content_text` 必须用「最终生效内容」** | `update()` 里**不能**用 `patch.content` 去算 —— 请求只改标题/置顶时不带 content，`patch.content` 为 null → `build(null)` 返回 `""` → **把已有搜索列覆盖成空**（R1 真实踩到）。正解：`finalContent = request.content != null ? patch.getContent() : note.getContent()`，用它算。配套回归断言：只改标题后正文不丢、列表 `excerpt` 必须**非空**、库里有 content 时 `content_text` 不得为空 | T5 |
+| D37 | **本地验证的固定顺序** | **停进程 → 构建 → 检查退出码为 0 →（可选）看 jar 时间戳 → 起新进程 → 再验证**。T5 实测：旧进程占着 jar 时 `mvn clean` 失败，而脚本没查退出码就继续跑 → 拿旧 jar 验证 → 假失败，白跑一轮 | 通用 |
 
 ---
 
