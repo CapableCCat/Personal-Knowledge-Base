@@ -42,6 +42,24 @@ export const ALLOWED_ATTR = [
   'style'
 ]
 
+/**
+ * **markdown 档**额外放行的属性：`class`。
+ *
+ * <p>为什么富文本档不能放、markdown 档必须放（T7）：
+ * - md 渲染产物里，代码高亮颜色**全靠** `<span class="hljs-keyword">` 这类类名，
+ *   代码块外壳靠 `md-editor-code-block` —— 一刀切禁 `class` 会让代码块变成一片单色；
+ * - md 源里的原始 HTML 默认被转义（markdown-it `html: false`），类名只可能来自
+ *   渲染器与 highlight.js，不像富文本那样可能夹带站点 UI 的类名。
+ */
+const MARKDOWN_EXTRA_ATTR = ['class']
+
+/**
+ * markdown 档允许保留的类名 —— 按**前缀**收敛，而不是放行任意 class：
+ * `hljs-*`（语法高亮）、`md-editor-*`（编辑器自身结构）、`language-*`（围栏语言标记）。
+ * 其余一律丢弃，防止 md 源伪造站点 UI 类名（如 `el-button`）去命中全局样式。
+ */
+const SAFE_CLASS_NAME = /^(?:hljs|md-editor|language)[-A-Za-z0-9_]*$/
+
 /** 危险容器：连同内容一起丢弃（否则 <script>alert(1)</script> 会留下满屏的 alert(1) 文本） */
 const DANGEROUS_TAGS = [
   'script', 'style', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet',
@@ -93,6 +111,18 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
       node.removeAttribute('style')
     }
   }
+  // markdown 档才允许 class（富文本档的 ALLOWED_ATTR 里没有 class，走到这里时已被剥掉）。
+  // 这里再按前缀收敛一次：只留渲染器/highlight.js 产生的类名。
+  if (node.hasAttribute('class')) {
+    const kept = String(node.getAttribute('class') || '')
+      .split(/\s+/)
+      .filter((token) => SAFE_CLASS_NAME.test(token))
+    if (kept.length) {
+      node.setAttribute('class', kept.join(' '))
+    } else {
+      node.removeAttribute('class')
+    }
+  }
 })
 
 const PURIFY_CONFIG = {
@@ -111,14 +141,43 @@ const PURIFY_CONFIG = {
 }
 
 /**
- * 清洗富文本 HTML。
+ * **markdown 档**配置 = 富文本档 + `class`。
+ * 标签白名单、危险容器、URI 协议全部与富文本档一致 —— 差别只在「要不要保住代码高亮的类名」。
+ */
+const PURIFY_CONFIG_MARKDOWN = {
+  ...PURIFY_CONFIG,
+  ALLOWED_ATTR: [...ALLOWED_ATTR, ...MARKDOWN_EXTRA_ATTR]
+}
+
+function purify(html, config) {
+  if (!html) return ''
+  return DOMPurify.sanitize(String(html), config)
+}
+
+/**
+ * 清洗富文本 HTML（**html 格式笔记**用：提交前一道、渲染前一道）。
  *
  * @param {string} html 原始 HTML
  * @returns {string} 清洗后的 HTML（入参为空时返回空串）
  */
 export function sanitizeHtml(html) {
-  if (!html) return ''
-  return DOMPurify.sanitize(String(html), PURIFY_CONFIG)
+  return purify(html, PURIFY_CONFIG)
+}
+
+/**
+ * 清洗 **Markdown 渲染产物**（md 格式笔记用：`MdEditor`/`MdPreview` 的 `sanitize` 钩子）。
+ *
+ * <p>为什么单独开一档（T7）：
+ * - md 是「源码 + 渲染器」，`<script>` 这类注入是渲染器**编译**出来的，不是用户直接写进
+ *   `v-html` 的字符串，所以同样必须过 DOMPurify（PRD P-004 的硬要求）；
+ * - 但不能沿用富文本档 —— 那档禁 `class`，会把 `hljs-*` 与 `md-editor-*` 一起剥掉，
+ *   代码高亮和代码块外壳直接失效。
+ *
+ * @param {string} html md 编译后的 HTML
+ * @returns {string} 清洗后的 HTML（入参为空时返回空串）
+ */
+export function sanitizeMarkdownHtml(html) {
+  return purify(html, PURIFY_CONFIG_MARKDOWN)
 }
 
 /**

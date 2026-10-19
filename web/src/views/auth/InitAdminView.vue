@@ -52,6 +52,9 @@ const rules = {
 }
 
 async function onSubmit() {
+  // ⚠️ 防重复提交（与登录页同理，见 LoginView 的注释）
+  if (loading.value) return
+
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
 
@@ -103,16 +106,15 @@ async function onSubmit() {
             type="password"
             show-password
             placeholder="请再次输入密码"
-            @keyup.enter="onSubmit"
           />
         </el-form-item>
 
+        <!-- ⚠️ 同登录页：提交只能有一个入口（native-type="submit" → el-form @submit.prevent） -->
         <el-button
           type="primary"
           class="init__submit"
           :loading="loading"
           native-type="submit"
-          @click="onSubmit"
         >
           创建账号
         </el-button>

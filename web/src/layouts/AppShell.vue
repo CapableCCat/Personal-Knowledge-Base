@@ -43,6 +43,7 @@ import { APP_NAME, ROUTE_PATH } from '@/constants/app'
 import { useLayoutMode } from '@/composables/useLayoutMode'
 import { useUserStore } from '@/stores/user'
 import { useRouteMenu } from '@/router/menu'
+import NoteDrawer from '@/components/NoteDrawer.vue'
 
 /**
  * 菜单图标映射：路由 `meta.menu.icon` 存的是**组件名字符串**（路由表是纯数据，不该 import 组件），
@@ -214,6 +215,13 @@ async function onAccountCommand(command) {
         </el-menu-item>
       </el-menu>
     </el-drawer>
+
+    <!--
+      笔记抽屉（桌面端）挂在外壳上，而不是某个页面里 ——
+      这样笔记列表（T6）与首页（T9）都能用 `useNoteDrawer().open(id)` 唤起，
+      不用各自维护一份抽屉。手机端不走它（走 `/note/:id` 全屏页）。
+    -->
+    <NoteDrawer />
   </div>
 </template>
 

@@ -50,6 +50,10 @@ async function refreshCaptcha() {
 }
 
 async function onSubmit() {
+  // ⚠️ 防重复提交（2026-10-17 实测：点一次曾发出 2 次 /auth/login）
+  // 验证码是**一次性**的（后端校验后立即删除），第二次必然拿到「验证码已过期」。
+  if (loading.value) return
+
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
 
@@ -100,7 +104,6 @@ onMounted(refreshCaptcha)
               v-model="form.captchaCode"
               maxlength="6"
               placeholder="请输入计算结果"
-              @keyup.enter="onSubmit"
             />
             <div class="login__captcha-box" title="看不清？点击刷新" @click="refreshCaptcha">
               <img v-if="captchaImage" class="login__captcha" :src="captchaImage" alt="图形验证码" />
@@ -109,12 +112,16 @@ onMounted(refreshCaptcha)
           </div>
         </el-form-item>
 
+        <!--
+          ⚠️ 提交只能有**一个**入口：靠 `native-type="submit"` 触发 `<el-form @submit.prevent>`。
+          绝对不要再加 `@click="onSubmit"` —— 那会让一次点击走两条路径（click + submit），
+          发出两次登录请求，第二次必然「验证码已过期」（2026-10-17 实测）。
+        -->
         <el-button
           type="primary"
           class="login__submit"
           :loading="loading"
           native-type="submit"
-          @click="onSubmit"
         >
           登录
         </el-button>

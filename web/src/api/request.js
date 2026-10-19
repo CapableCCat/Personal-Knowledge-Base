@@ -43,9 +43,25 @@ let redirectingToLogin = false
 async function redirectToLogin() {
   if (redirectingToLogin) return
   redirectingToLogin = true
-  localStorage.removeItem(STORAGE_KEY.TOKEN)
-  localStorage.removeItem(STORAGE_KEY.PROFILE)
   try {
+    /**
+     * ⚠️ **必须同时清 Pinia 里的登录态**（2026-10-17 T6 实测踩到）：
+     * 只清 `localStorage` 的话，路由守卫读的是 store 里的 `token` ref —— 它仍是有值的，
+     * 于是守卫认为「已登录」，把 `/login` 按「已登录不许看登录页」又弹回首页 `/`，
+     * 最终表现是「token 失效后落在首页而不是登录页」。
+     */
+    const [, userStoreModule] = await Promise.all([
+      import('@/router'),
+      import('@/stores/user')
+    ])
+    try {
+      userStoreModule.useUserStore().clear()
+    } catch {
+      // Pinia 未就绪时兜底：至少把持久化清掉
+    }
+    localStorage.removeItem(STORAGE_KEY.TOKEN)
+    localStorage.removeItem(STORAGE_KEY.PROFILE)
+
     const { default: router } = await import('@/router')
     await router.replace({
       path: ROUTE_PATH.LOGIN,
@@ -79,8 +95,12 @@ service.interceptors.response.use(
       return body.data
     }
     if (body.code === CODE.UNAUTHORIZED) {
+      // 多个请求同时 40100 时只提示一次（redirectToLogin 内部有重入锁，
+      // 这里用同一把锁判断，避免屏幕上连弹好几条「登录已过期」）
+      if (!redirectingToLogin) {
+        ElMessage.warning(body.message || '登录已过期，请重新登录')
+      }
       await redirectToLogin()
-      ElMessage.warning(body.message || '登录已过期，请重新登录')
     } else if (body.code === CODE.SYSTEM_ERROR || body.code === CODE.DOWNSTREAM_ERROR) {
       ElMessage.error(body.message || '系统繁忙，请稍后重试')
     } else {
