@@ -14,8 +14,10 @@
  *   首页 / 列表页不该为「打开一条笔记」付这个首屏成本。
  * - **XSS**：html 提交前过 `sanitizeHtml`，md 渲染产物在编辑器内部过
  *   `sanitizeMarkdownHtml`（见 `MarkdownEditor.vue` 与 `utils/sanitizeHtml.js`）
+ * - **项目 / 标签**（T8）：项目**单选**（`tag.type=1`，可清空）、标签**多选**（`tag.type=0`）；
+ *   保存时随主请求一起提交（后端在同一事务里做「全量替换」），不做两次请求
  */
-import { computed, defineAsyncComponent, nextTick, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   archiveNote,
@@ -26,6 +28,7 @@ import {
   unarchiveNote,
   updateNote
 } from '@/api/note'
+import { listTags } from '@/api/tag'
 import { useLayoutMode } from '@/composables/useLayoutMode'
 import { sanitizeHtml } from '@/utils/sanitizeHtml'
 
@@ -49,8 +52,12 @@ const removing = ref(false)
 /** 编辑器高度：抽屉里给固定值；手机全屏页给 vh，避免把保存按钮挤出屏幕 */
 const editorHeight = computed(() => (layoutMode.value === 'mobile' ? '46vh' : '380px'))
 
+/** 项目选项（type=1）与标签选项（type=0）—— 一次请求拿全，靠 type 分流 */
+const projects = ref([])
+const tagOptions = ref([])
+
 function emptyForm() {
-  return { title: '', content: '', contentFormat: 0, pinned: 0, status: 0 }
+  return { title: '', content: '', contentFormat: 0, pinned: 0, status: 0, projectId: null, tagIds: [] }
 }
 
 const form = ref(emptyForm())
@@ -61,6 +68,11 @@ const formatLabel = computed(() => (form.value.contentFormat === 1 ? 'HTML' : 'M
 const statusLabel = computed(() => (form.value.status === 1 ? '已归档' : '待整理'))
 const isDirty = computed(() => serialize(form.value) !== snapshot.value)
 
+/** id 列表排序：脏检查要稳定，选择顺序不该被当成「改了」 */
+function sortIds(ids) {
+  return [...(ids || [])].filter((id) => id !== null && id !== undefined).sort((a, b) => a - b)
+}
+
 /** 只序列化「可编辑且参与脏检查」的字段（顺序固定，保证比较稳定） */
 function serialize(f) {
   return JSON.stringify({
@@ -68,9 +80,24 @@ function serialize(f) {
     content: f.content,
     contentFormat: f.contentFormat,
     pinned: f.pinned,
-    status: f.status
+    status: f.status,
+    projectId: f.projectId ?? null,
+    tagIds: sortIds(f.tagIds)
   })
 }
+
+/** 拉取项目 / 标签选项（管理页改完回来会重新挂载表单，所以每次打开都取一次最新） */
+async function loadOptions() {
+  try {
+    const all = await listTags()
+    projects.value = (all || []).filter((tag) => tag.type === 1)
+    tagOptions.value = (all || []).filter((tag) => tag.type === 0)
+  } catch {
+    // 拦截器已提示；选项拿不到只是不能选，不影响正文编辑
+  }
+}
+
+onMounted(loadOptions)
 
 /**
  * 未保存修改的确认框。
@@ -110,7 +137,9 @@ async function load() {
       content: note.content || '',
       contentFormat: note.contentFormat ?? 0,
       pinned: note.pinned ?? 0,
-      status: note.status ?? 0
+      status: note.status ?? 0,
+      projectId: note.projectId ?? null,
+      tagIds: sortIds((note.tags || []).map((tag) => tag.id))
     }
     snapshot.value = serialize(form.value)
   } catch {
@@ -185,12 +214,20 @@ async function save() {
     const isHtml = form.value.contentFormat === 1
     const content = isHtml ? sanitizeHtml(form.value.content) : form.value.content
 
+    // 项目 / 标签随主请求一起提交（后端同一事务里「全量替换」）——
+    // 刻意不拆成两次请求：拆了就会出现「正文存了、标签没存」的半边成功（PRD NFR）。
+    const associations = {
+      projectId: form.value.projectId ?? null,
+      tagIds: sortIds(form.value.tagIds)
+    }
+
     let saved
     if (isNew.value) {
       saved = await createNote({
         title: form.value.title,
         content,
-        contentFormat: form.value.contentFormat
+        contentFormat: form.value.contentFormat,
+        associations
       })
       // ⚠️ 关键：切到已创建 id，否则再点保存会重复创建
       currentId.value = saved.id
@@ -201,7 +238,8 @@ async function save() {
         content,
         // 传相同格式：后端允许；传不同会被 40000 拒绝
         contentFormat: form.value.contentFormat,
-        pinned: form.value.pinned
+        pinned: form.value.pinned,
+        associations
       })
       ElMessage.success('已保存')
     }
@@ -212,7 +250,9 @@ async function save() {
       content: saved.content || '',
       contentFormat: saved.contentFormat ?? form.value.contentFormat,
       pinned: saved.pinned ?? 0,
-      status: saved.status ?? 0
+      status: saved.status ?? 0,
+      projectId: saved.projectId ?? null,
+      tagIds: sortIds((saved.tags || []).map((tag) => tag.id))
     }
     // 等编辑器把新值同步进 DOM 再取快照，避免编辑器自身的规范化触发一次假「未保存」
     await nextTick()
@@ -338,6 +378,47 @@ defineExpose({ isDirty, save, confirmDiscard })
       placeholder="标题（可留空）"
     />
 
+    <!-- 项目（单选，可清空） + 标签（多选）—— T8。项目是 tag.type=1，标签是 tag.type=0 -->
+    <div class="note-form__taxonomy">
+      <div class="note-form__field">
+        <span class="note-form__field-label">项目</span>
+        <el-select
+          v-model="form.projectId"
+          class="note-form__project"
+          size="small"
+          clearable
+          filterable
+          placeholder="不挂项目"
+        >
+          <el-option v-for="item in projects" :key="item.id" :label="item.name" :value="item.id">
+            <span class="note-form__option-dot" :style="{ background: item.color || 'var(--border-color)' }" />
+            {{ item.name }}
+          </el-option>
+        </el-select>
+      </div>
+
+      <div class="note-form__field note-form__field--grow">
+        <span class="note-form__field-label">标签</span>
+        <el-select
+          v-model="form.tagIds"
+          class="note-form__tags"
+          size="small"
+          multiple
+          filterable
+          clearable
+          collapse-tags
+          collapse-tags-tooltip
+          :max-collapse-tags="3"
+          placeholder="可多选；超过 50 个可直接搜索"
+        >
+          <el-option v-for="item in tagOptions" :key="item.id" :label="item.name" :value="item.id">
+            <span class="note-form__option-dot" :style="{ background: item.color || 'var(--border-color)' }" />
+            {{ item.name }}
+          </el-option>
+        </el-select>
+      </div>
+    </div>
+
     <!-- 正文：按 contentFormat 分流（T7）。两个编辑器都是懒加载，首屏不背它们的体积。 -->
     <MarkdownEditor
       v-if="form.contentFormat !== 1"
@@ -397,6 +478,49 @@ defineExpose({ isDirty, save, confirmDiscard })
 
 .note-form__format {
   flex-shrink: 0;
+}
+
+/* 项目 / 标签一排：桌面并排，窄屏自动换行（标签那一栏吃掉剩余宽度） */
+.note-form__taxonomy {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.note-form__field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.note-form__field--grow {
+  flex: 1 1 240px;
+}
+
+.note-form__field-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.note-form__project {
+  width: 160px;
+}
+
+.note-form__tags {
+  flex: 1;
+  min-width: 0;
+}
+
+.note-form__option-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: middle;
 }
 
 .note-form__actions {

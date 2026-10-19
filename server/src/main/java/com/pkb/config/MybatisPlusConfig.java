@@ -31,20 +31,33 @@ public class MybatisPlusConfig {
         return interceptor;
     }
 
-    /** 时间字段自动填充：created_at / updated_at */
+    /**
+     * 时间字段自动填充：created_at / updated_at。
+     *
+     * <p>⚠️ **每个字段都先判 `hasSetter`**：T1 实测过 {@code strictInsertFill} 在实体缺少
+     * 对应属性时会抛异常（当时是删了审计列却忘了删填充逻辑）。
+     * T8 新增的 {@code note_tag} 两个字段都没有、{@code tag} 没有 {@code updatedAt} ——
+     * 用「有才填」的写法，新增实体就不必回头改这里。
+     */
     @Bean
     public MetaObjectHandler metaObjectHandler() {
         return new MetaObjectHandler() {
             @Override
             public void insertFill(MetaObject metaObject) {
                 LocalDateTime now = LocalDateTime.now();
-                strictInsertFill(metaObject, "createdAt", LocalDateTime.class, now);
-                strictInsertFill(metaObject, "updatedAt", LocalDateTime.class, now);
+                if (metaObject.hasSetter("createdAt")) {
+                    strictInsertFill(metaObject, "createdAt", LocalDateTime.class, now);
+                }
+                if (metaObject.hasSetter("updatedAt")) {
+                    strictInsertFill(metaObject, "updatedAt", LocalDateTime.class, now);
+                }
             }
 
             @Override
             public void updateFill(MetaObject metaObject) {
-                strictUpdateFill(metaObject, "updatedAt", LocalDateTime.class, LocalDateTime.now());
+                if (metaObject.hasSetter("updatedAt")) {
+                    strictUpdateFill(metaObject, "updatedAt", LocalDateTime.class, LocalDateTime.now());
+                }
             }
         };
     }
