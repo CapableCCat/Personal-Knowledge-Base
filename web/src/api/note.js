@@ -14,10 +14,16 @@ export const createNote = (data) => request.post('/note', data)
 export const getNote = (id) => request.get(`/note/${id}`)
 
 /**
- * 列表（分页 + 状态筛选；**不返回正文**，只有 excerpt）。
- * @param {{page?:number,size?:number,status?:number|null}} params
+ * 列表（分页 + 状态 / 项目 / 标签 / 本周筛选；**不返回正文**，只有 excerpt）。
+ * @param {{page?:number,size?:number,status?:number|null,projectId?:number,tagIds?:string,weekOnly?:boolean}} params
  */
 export const pageNotes = (params) => request.get('/note/page', { params })
+
+/**
+ * 首页状态条统计（P-010）：待整理 / 已归档 / 项目数 / 本周新建数。
+ * 「本周」= 本周一 00:00 起算（PRD #11）。
+ */
+export const getNoteStats = () => request.get('/note/stats')
 
 /** 更新标题 / 正文 / 置顶（格式不可改） */
 export const updateNote = (id, data) => request.put(`/note/${id}`, data)

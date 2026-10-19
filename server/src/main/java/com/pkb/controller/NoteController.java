@@ -5,6 +5,7 @@ import com.pkb.dto.NoteCreateRequest;
 import com.pkb.dto.NoteListItemVO;
 import com.pkb.dto.NotePinnedRequest;
 import com.pkb.dto.NoteQuery;
+import com.pkb.dto.NoteStatsVO;
 import com.pkb.dto.NoteUpdateRequest;
 import com.pkb.dto.NoteVO;
 import com.pkb.dto.PageResult;
@@ -40,10 +41,21 @@ public class NoteController {
         return Result.ok(noteService.create(request), "已保存");
     }
 
-    /** 列表（分页 + 状态筛选；不含正文，只返回摘要） */
+    /** 列表（分页 + 状态 / 项目 / 标签 / 本周筛选；不含正文，只返回摘要） */
     @GetMapping("/page")
     public Result<PageResult<NoteListItemVO>> page(NoteQuery query) {
         return Result.ok(noteService.page(query));
+    }
+
+    /**
+     * 首页状态条统计（P-010）。
+     *
+     * <p>⚠️ 必须声明在 {@code /{id}} 之前吗？不需要 —— Spring 会优先匹配字面量路径
+     * {@code /stats}，不会把它当成 id。但**别把这里改成 `/{id}` 的子路径**，那会撞上 id 解析。
+     */
+    @GetMapping("/stats")
+    public Result<NoteStatsVO> stats() {
+        return Result.ok(noteService.stats());
     }
 
     /** 详情（含全文） */

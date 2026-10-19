@@ -3,6 +3,7 @@ package com.pkb.service;
 import com.pkb.dto.NoteCreateRequest;
 import com.pkb.dto.NoteListItemVO;
 import com.pkb.dto.NoteQuery;
+import com.pkb.dto.NoteStatsVO;
 import com.pkb.dto.NoteUpdateRequest;
 import com.pkb.dto.NoteVO;
 import com.pkb.dto.PageResult;
@@ -40,4 +41,12 @@ public interface NoteService {
 
     /** 逻辑删除（`is_deleted=1`，行仍在库里） */
     void delete(Long id);
+
+    /**
+     * 首页状态条统计（P-010）。
+     *
+     * <p>四项：待整理 / 已归档 / 项目数 / 本周新建数。
+     * 「本周」= 本周一 00:00 起算（PRD #11 拍板）。
+     */
+    NoteStatsVO stats();
 }

@@ -12,6 +12,7 @@ import com.pkb.dto.NoteAssociationsRequest;
 import com.pkb.dto.NoteCreateRequest;
 import com.pkb.dto.NoteListItemVO;
 import com.pkb.dto.NoteQuery;
+import com.pkb.dto.NoteStatsVO;
 import com.pkb.dto.NoteUpdateRequest;
 import com.pkb.dto.NoteVO;
 import com.pkb.dto.PageResult;
@@ -30,6 +31,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -226,6 +229,26 @@ public class NoteServiceImpl implements NoteService {
     }
 
     @Override
+    public NoteStatsVO stats() {
+        // ⚠️ 四项都依赖 MP 的 @TableLogic 自动追加 is_deleted=0，不要手写 where。
+        long inbox = noteMapper.selectCount(Wrappers.<Note>lambdaQuery()
+                .eq(Note::getStatus, NoteStatus.INBOX.getCode()));
+        long archived = noteMapper.selectCount(Wrappers.<Note>lambdaQuery()
+                .eq(Note::getStatus, NoteStatus.ARCHIVED.getCode()));
+        long projects = tagMapper.selectCount(Wrappers.<Tag>lambdaQuery()
+                .eq(Tag::getType, TagType.PROJECT.getCode()));
+        // 「本周」= 本周一 00:00 起算（PRD #11 拍板：周一起算、算本周新建笔记数，不区分状态）
+        long weekAdded = noteMapper.selectCount(Wrappers.<Note>lambdaQuery()
+                .ge(Note::getCreatedAt, weekStart()));
+        return new NoteStatsVO(inbox, archived, projects, weekAdded);
+    }
+
+    /** 本周起点（周一 00:00，服务器本地时区）—— `with(MONDAY)` 在 ISO 周里就是本周一 */
+    private java.time.LocalDateTime weekStart() {
+        return LocalDate.now().with(DayOfWeek.MONDAY).atStartOfDay();
+    }
+
+    @Override
     public PageResult<NoteListItemVO> page(NoteQuery query) {
         int pageNo = resolvePage(query == null ? null : query.page());
         int pageSize = resolveSize(query == null ? null : query.size());
@@ -236,6 +259,10 @@ public class NoteServiceImpl implements NoteService {
         wrapper.select(Note.class, info -> !"content".equals(info.getColumn()));
         if (status != null) {
             wrapper.eq(Note::getStatus, status);
+        }
+        // 「只看本周新建」筛选（首页状态条「本周 +N」点进来）
+        if (query != null && Boolean.TRUE.equals(query.weekOnly())) {
+            wrapper.ge(Note::getCreatedAt, weekStart());
         }
 
         // ---- 项目 / 标签筛选（T8，PRD P-002）----

@@ -31,7 +31,14 @@ const { open: openDrawer, version } = useNoteDrawer()
  * （T6 放大截图才发现：功能能点，但看不出当前筛选）。
  */
 const STATUS_ALL = 'all'
-const status = ref(STATUS_ALL)
+
+/** query → 状态筛选（首页状态条「待整理 / 已归档」点进来会带 status=0/1） */
+function toStatus(raw) {
+  const value = Array.isArray(raw) ? raw[0] : raw
+  return value === '0' || value === '1' ? value : STATUS_ALL
+}
+
+const status = ref(toStatus(route.query.status))
 
 /**
  * 项目 / 标签筛选（T8，PRD P-002）。
@@ -40,6 +47,12 @@ const status = ref(STATUS_ALL)
  */
 const projectId = ref(toId(route.query.projectId))
 const tagIds = ref(toId(route.query.tagId) ? [toId(route.query.tagId)] : [])
+
+/**
+ * 「只看本周新建」（首页状态条「本周 +N」点进来带 week=1）。
+ * 口径与后端一致：本周一 00:00 起算（PRD #11）。
+ */
+const weekOnly = ref(route.query.week === '1' || route.query.week === 'true')
 
 const projects = ref([])
 const tagOptions = ref([])
@@ -70,7 +83,8 @@ async function load() {
       size: size.value,
       status: statusParam.value,
       projectId: projectId.value ?? undefined,
-      tagIds: tagIdsParam.value
+      tagIds: tagIdsParam.value,
+      weekOnly: weekOnly.value || undefined
     })
     items.value = data.records || []
     total.value = data.total || 0
@@ -97,8 +111,8 @@ onMounted(() => {
   load()
 })
 
-// 三类筛选任一变化 → 回到第 1 页（若本来就在第 1 页则直接重载）
-watch([status, projectId, tagIds], () => {
+// 四类筛选任一变化 → 回到第 1 页（若本来就在第 1 页则直接重载）
+watch([status, projectId, tagIds, weekOnly], () => {
   if (page.value !== 1) {
     page.value = 1
   } else {
@@ -109,12 +123,14 @@ watch(page, load)
 // 抽屉里保存 / 删除后刷新
 watch(version, load)
 
-// 从项目管理页 / 标签管理页再跳一次（组件复用、query 变了）时同步筛选
+// 从首页状态条 / 项目管理页 / 标签管理页再跳一次（组件复用、query 变了）时同步筛选
 watch(
   () => route.query,
   (query) => {
+    status.value = toStatus(query.status)
     projectId.value = toId(query.projectId)
     tagIds.value = toId(query.tagId) ? [toId(query.tagId)] : []
+    weekOnly.value = query.week === '1' || query.week === 'true'
   }
 )
 
@@ -123,6 +139,7 @@ function clearFilters() {
   status.value = STATUS_ALL
   projectId.value = null
   tagIds.value = []
+  weekOnly.value = false
 }
 
 /** 卡片上最多展示 3 个标签，超出显示 +n（PRD P-002） */
@@ -253,6 +270,7 @@ function formatTime(value) {
       <el-button link size="small" class="notes__clear" @click="clearFilters">清除筛选</el-button>
 
       <div class="notes__toolbar-right">
+        <el-tag v-if="weekOnly" size="small" type="warning" effect="plain">本周新增</el-tag>
         <span class="notes__count">共 {{ total }} 条</span>
         <el-button type="primary" size="small" @click="createNew">新建笔记</el-button>
       </div>
