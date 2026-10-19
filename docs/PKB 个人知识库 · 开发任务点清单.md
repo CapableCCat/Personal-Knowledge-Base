@@ -7,14 +7,14 @@
 > `docs/PKB 个人知识库 · 新对话交接提示词（通用版）.md`，**不在本文件重复抄写**。
 >
 > **配套文档**：
-> - `docs/个人知识库 PKB · 产品需求文档 V0.1.md`（**权威需求依据**，代码以 PRD 为准）
+> - `docs/PKB 个人知识库 · 产品需求文档 V0.1.md`（**权威需求依据**，代码以 PRD 为准）
 > - `docs/PKB 个人知识库 · 新对话交接提示词（通用版）.md`（开工与铁律，新对话第一份读物）
 > - `docs/PKB 个人知识库 · 现状信息说明.md`（项目缘起与决策讨论结论，历史存档）
 > - `.workbuddy/memory/`（项目记忆：`MEMORY.md` + 每日日志）
 >
 > **维护方式**：每完成一个任务点 → 更新 §3 状态列 + 在 §4 该条目补「实现结果」+ §6 追加决策。
 >
-> **本文件当前状态**：🟡 **初始化模板**。§3 总表为**草案编号**（T1~T12，取自 PRD §3.1 与交接文档 §三）；§4 只填了 T1（本轮任务），T2 起在开工前补「技术方案」。
+> **本文件当前状态**：🟢 **进行中（T1~T7 已完成，下一步 T8）**。§3 总表为正式编号（T1~T12）；§4 每个已完成任务点都有「技术方案 / 实现结果 / 验证指引」，T8 起在开工前补「技术方案」；§6 决策已累积到 D50。
 
 ---
 
@@ -25,7 +25,7 @@
 | 项目 | PKB 个人知识库（Personal Knowledge Base）· V0.1 |
 | 定位 | 自用「第二大脑」，单用户，本机 / 局域网 |
 | 工作空间 | `F:\Project\Own Project\Personal-Knowledge-Base`（**DSH 工作空间绑定，不可改名**） |
-| 需求依据 | `docs/个人知识库 PKB · 产品需求文档 V0.1.md` |
+| 需求依据 | `docs/PKB 个人知识库 · 产品需求文档 V0.1.md` |
 | 脚手架来源（**只读**） | `F:\Project\Own Project\New-Management-System`（OSC 归档，远端 `git@github.com:CapableCCat/New-Management-System.git`，**只 fetch 不 push**） |
 | Git 远端 | `git@github.com:CapableCCat/Personal-Knowledge-Base.git`（**新建仓**，非 OSC 沿用） |
 | 部署形态 | 单用户本机 / 局域网；**V0.1 不做上线部署**（无「上线部署」章节） |
@@ -65,8 +65,8 @@
 | T3 | 单账号登录（引导页 + Sa-Token + 图形验证码） | P-011 | T2 | ✅ **已完成** |
 | T4 | 外壳改造（菜单砍项 + 底部 3 Tab + 只留登录守卫 + `roles.js` 整删） | PRD §8.2 / §2.2 | T3 | ✅ **已完成** |
 | T5 | 笔记 CRUD（后端，含 `content_text` 同步 / 归档 / 取回 / 置顶） | P-001 / P-005 | T2 | ✅ **已完成** |
-| T6 | 笔记列表 + 详情（前端，drawer / 全屏页 + 复用同一份表单） | P-002 / P-003 | T5 | 🟡 **本轮任务** |
-| T7 | 双格式编辑（md 编辑器选型 + 富文本复用 + 分流清洗） | P-004 | T6 | ⬜ 未开始 |
+| T6 | 笔记列表 + 详情（前端，drawer / 全屏页 + 复用同一份表单） | P-002 / P-003 | T5 | ✅ **已完成** |
+| T7 | 双格式编辑（md 编辑器选型 + 富文本复用 + 分流清洗） | P-004 | T6 | ✅ **已完成** |
 | T8 | 项目 / 标签（CRUD + 关联 + **项目单选后端兜底** + 计数） | P-006 / P-007 | T5 | ⬜ 未开始 |
 | T9 | 首页工作台（桌面三列各自滚动 + 手机 3 Tab + 状态条） | P-010 | T6 | ⬜ 未开始 |
 | T10 | 搜索（只打 `title + content_text`） | P-008 | T5 | ⬜ 未开始 |
@@ -736,10 +736,15 @@ Invoke-RestMethod http://127.0.0.1:8080/auth/init-status | ConvertTo-Json
 
 **处置**：V12 拆成两半验（页面侧 + 接口侧），**端到端验证推迟到 T5/T6**（届时有了真接口）：
 
-- V12a 守卫放行（本地有 token 即放行）✅
-- V12b 该页无受保护接口调用 → token 未被清（**证明守卫不打后端**）✅
+- V12a 守卫放行（本地有 token 即放行）✅ ← **⚠️ 2026-10-17 已失效，见下**
+- V12b 该页无受保护接口调用 → token 未被清（**证明守卫不打后端**）✅ ← **⚠️ 已失效**
 - V12c 后端对无效 token 返回 `40100` ✅
-- ⏳ **待 T5/T6 补验**：真实接口返回 40100 → 拦截器清态 + 跳登录
+- ✅ **待 T5/T6 补验：真实接口返回 40100 → 拦截器清态 + 跳登录（2026-10-17 已在 T6 闭环）**
+
+> 🔄 **2026-10-17 更新（T6 交付时）**：T6 起 `/notes` 会真的调 `/note/page`，
+> 所以 V12a/V12b 记录的「旧行为」不再成立 —— 现在带无效 token 进 `/notes` 会
+> **被 40100 拦回 `/login?redirect=/notes` 且本地 token 被清**。
+> 这两条断言**已按新行为改写**（`t3_page_verify.cjs`），端到端完整覆盖见 `t6_page_verify.cjs` 的 M11。
 
 **⑥ 验证过程中我自己踩的 3 个坑（已写进 pkb-verify/SKILL.md）**
 
@@ -1281,36 +1286,372 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8080/note/$($created.data.id)/unarchive
 
 ---
 
-### T6 笔记列表 + 详情（前端） ⬜
+### T6 笔记列表 + 详情（前端） ✅
 
-> 状态：**未开始**。
+> 状态：**已完成（2026-10-17）**。页面实测 31/31；顺带补验掉 T3 挂账的 40100 端到端。
 
 - **覆盖**：P-002（笔记列表）、P-003（笔记详情 / 编辑）
-- **依赖**：T5
-- **范围**：列表页（筛选 + 排序 `pinned DESC, updated_at DESC` + 分页）；桌面 `el-drawer`（~720px）+ 手机全屏页 `/note/:id`，**两处复用同一份表单组件**
+- **依赖**：T5 ✅
+- **范围**：`NotesView` 列表（筛选 / 排序 / 分页 / 行内操作）、`NoteDetailView` 全屏页、桌面 `el-drawer`、**两处复用同一份表单组件**
 - **关键坑**：`el-drawer` 关闭是 `v-show`，验证「已关闭」用 `!!el.offsetParent`
-- **技术方案**：⬜ 待开工前产出
+- **另一项挂账**：**补验 40100 端到端**（T3 起挂账 —— 现在有真接口了）
+
+#### T6 技术方案（✅ 用户已授权开发）
+
+**① 交付物**
+
+| 文件 | 作用 |
+| :--- | :--- |
+| `web/src/api/note.js` | 8 个接口的前端封装 |
+| `web/src/composables/useNoteDrawer.js` | **抽屉的模块级单例状态**（open / close / version）。列表页与 T9 首页共用，避免各维护一份 |
+| `web/src/components/NoteForm.vue` | **唯一的一份表单**（标题 / 正文 / 置顶 / 格式徽标 / 保存 / 归档 / 删除 / 未保存拦截） |
+| `web/src/components/NoteDrawer.vue` | 桌面抽屉外壳，内嵌 `NoteForm` |
+| `web/src/views/notes/NotesView.vue` | 列表页（**重写**占位实现） |
+| `web/src/views/notes/NoteDetailView.vue` | 手机全屏页（**重写**占位实现） |
+| `web/src/layouts/AppShell.vue` | 挂载 `<NoteDrawer />`（任何内部页都能唤起抽屉，T9 直接复用） |
+
+**② 关键设计**
+
+- **桌面 vs 手机**（PRD D-7）：`useLayoutMode() === 'mobile'` → 路由到 `/note/:id`；否则 `useNoteDrawer().open(id)`。
+- **新建**：桌面 → 抽屉（id=null）；手机 → `/note/new`（`NoteDetailView` 把 `new` 当创建态）。
+- **列表形态**：**统一卡片流**（不区分桌面表格 / 手机卡片）—— 少一套实现，天然无横向滚动。
+- **`NoteForm` 自带取数**：按 `noteId` 自己拉详情，父组件只负责「打开哪个 id」。
+- **保存后不关抽屉**：创建成功后把内部 `currentId` 切到新 id（否则再点保存会重复创建），并 `bump()` 让列表刷新。
+- **未保存拦截**：dirty 用「当前值 vs 快照」比较；抽屉 `before-close` 与全屏页返回都二次确认（PRD P-003）。
+- **编辑器本轮用 `textarea`**：md 编辑器与富文本是 **T7** 的事；本轮只保证「能读能写、格式只读展示」。
+
+**③ 本轮不做（防越界）**
+
+❌ md / 富文本编辑器（T7）｜❌ 项目 / 标签（T8）｜❌ 附件（T11）｜❌ 首页三列（T9）｜❌ 搜索（T10）｜❌ 不改后端接口
+
+**④ 待实测**
+
+| # | 验证项 | 预期 |
+| :--- | :--- | :--- |
+| M1 | 列表加载 | 卡片流渲染（标题/摘要/格式徽标/状态/时间） |
+| M2 | 状态筛选 | 全部 / 待整理 / 已归档 切换后列表随之变化 |
+| M3 | 分页 | 超过 20 条时出现分页，翻页正常 |
+| M4 | 桌面点卡片 | 打开 `el-drawer`，字段回填正确 |
+| M5 | 手机点卡片 | 跳到 `/note/{id}` 全屏页，字段与桌面一致 |
+| M6 | 新建并保存 | 列表出现新笔记；**再点保存不会重复创建** |
+| M7 | 归档 / 取回 | 行内操作生效，列表与筛选同步 |
+| M8 | 置顶 | 操作后该项排到最前 |
+| M9 | 删除 | 二次确认 → 移除 → 列表刷新 |
+| M10 | 未保存关闭 | 有改动时关闭抽屉 / 返回，弹二次确认 |
+| M11 | **40100 端到端** | token 改坏 → 列表请求收到 40100 → **自动清态并跳登录** |
+| M12 | 375 宽 | 卡片流无横向滚动 |
 
 #### T6 实现结果
 
-⬜ 未开始。
+> 状态：**已完成（2026-10-17）**。页面实测 **31/31 全过**（CDP + dist 产物 + 隔离栈 8090/5180），
+> **同时补验掉了 T3 起挂账的「40100 端到端」**。
+
+**① 交付物（7 个文件：4 新增 / 3 修改）**
+
+| 文件 | 说明 |
+| :--- | :--- |
+| `web/src/api/note.js` | 新增：8 个接口封装 |
+| `web/src/composables/useNoteDrawer.js` | 新增：抽屉的**模块级单例状态**（open / close / version） |
+| `web/src/components/NoteForm.vue` | 新增：**全站唯一的一份笔记表单**（自带取数 / 脏检查 / 归档 / 置顶 / 删除） |
+| `web/src/components/NoteDrawer.vue` | 新增：桌面抽屉外壳（标题栏 + 关闭按钮 + 关闭前拦截） |
+| `web/src/views/notes/NotesView.vue` | 重写：列表（筛选 / 卡片流 / 分页 / 行内操作） |
+| `web/src/views/notes/NoteDetailView.vue` | 重写：手机全屏页（`/note/:id` + `/note/new`） |
+| `web/src/layouts/AppShell.vue` | 修改：挂载 `<NoteDrawer />`（任何内部页都能唤起，T9 直接复用） |
+| `web/src/api/request.js` | 修改：40100 时**同时清 Pinia 登录态**（见 ③-1） |
+| `server/.../NoteServiceImpl.java` | 修改：置顶/归档**不再刷 `updated_at`** + 排序加 `id DESC` 兜底（见 ③-2、③-3） |
+
+**② 实测 31/31（M1~M12 全覆盖）**
+
+| 组 | 实测 |
+| :--- | :--- |
+| M1 列表 | 20 条/页、总数「共 25 条」、徽标 40 个、摘要非空、**「全部」默认激活**（`activeCount=1`） |
+| M2 筛选 | 已归档 1 条 / 待整理 20 条（共 24）/ 全部恢复 20 条 |
+| M3 分页 | 分页器出现；翻到第 2 页 5 条 |
+| M4 抽屉 | `offsetParent` 判定可见、标题/正文回填、格式徽标 `Markdown` |
+| M5 手机 | 跳 `/note/{id}`、渲染同一份表单、字段与列表一致、**不使用抽屉** |
+| M6 新建 | **连点两次保存只创建 1 条**（创建后切到真实 id，防重复） |
+| M8 置顶 | 置顶项排最前；**取消置顶后不再最前**（`T6-25` 顶上来） |
+| M9 删除 | 二次确认 → 总数 −1 |
+| M10 未保存 | 出现「有未保存的修改」→ 关闭弹确认 →「继续编辑」保持打开 →「丢弃修改」才关 |
+| M11 **40100** | token 改坏 → **清态 + 跳 `/login?redirect=/notes`** |
+| M12 375 宽 | `scrollWidth === innerWidth`（375），无横向滚动 |
+
+**③ 🔴 实测抓到 4 个真问题（全部已修）**
+
+**1）40100 拦了，但页面落到首页而不是登录页（T3 挂账项，终于验出来）**
+
+- **现象**：token 失效后 `localStorage` 被清空，但页面停在 `/` 而不是 `/login`。
+- **根因**：`request.js` 只清了 `localStorage`，**没清 Pinia 里的 `token` ref**；
+  路由守卫读的是 store → 仍认为「已登录」→ 按「已登录不许看登录页」把 `/login` 又弹回首页。
+- **修复**：`redirectToLogin()` 里动态引入 `useUserStore()` 并 `clear()`，再清持久化、再 `router.replace`。
+- **这也解释了用户此前的疑问**（「我没被踢下线」）：T3 阶段没有页面调受保护接口，前端根本发现不了 token 已死。
+
+**2）置顶/归档会把笔记顶到「最近」最前面**
+
+- **现象**：取消置顶后，那条笔记仍然排第一。
+- **根因**：状态更新走 `update(null, wrapper)`，而我上一版**显式写入了 `updated_at = now`**；
+  叠加表上的 `ON UPDATE CURRENT_TIMESTAMP`，于是「置顶」被当成一次「编辑」。
+- **修复**：改为**显式把 `updated_at` 写回原值**（不是 now，也不是不写 —— 不写 MySQL 也会自动刷）。
+- **定稿**：**归档 / 取回 / 置顶都不算「编辑过」**，不动 `updated_at`（PRD P-005 曾标为待确认，此处关闭）。
+
+**3）排序没有兜底键，同一秒创建的笔记顺序不稳定**
+
+- **现象**：25 条笔记的 `updated_at` 完全相同（DATETIME 秒级精度），列表顺序在两次请求间会变。
+- **修复**：排序追加 `id DESC` 兜底 → `pinned DESC, updated_at DESC, id DESC`（**确定性排序**）。
+
+**4）筛选按钮「看不出当前选的是哪个」**（放大截图才发现）
+
+- **现象**：功能正常（点击能筛），但三个按钮**全灰**，没有激活态。
+- **根因**：用 `:value="null"` 表示「全部」，而 EP 的 `el-radio-group` 拿 `modelValue === value` 比，
+  `null` 被当成「未选中」。
+- **修复**：改用字符串哨兵 `'all'`，提交给后端时再映射回 `null`。
+
+**另外两处小修（截图评审发现）**：
+- 抽屉原先 `:with-header="false"`，**没有可见的关闭按钮**（只能 Esc / 点遮罩）→ 补上标题栏 + 关闭按钮。
+- 手机全屏页的页内标题与应用页头都写「笔记详情」，一行里重复 → 页内改为「新建笔记 / 编辑笔记」。
+
+**④ 本轮刻意没做**
+
+- md 渲染 / md 编辑器 / 富文本 → **T7**（本轮正文就是 `textarea`，原样展示 `**加粗**`）
+- 项目 / 标签筛选与展示 → **T8**
+- 首页三列与快速记录 → **T9**
+- 搜索 → **T10**；附件 → **T11**
+
+**⑤ 交付后用户实测反馈（2026-10-17，均已修复）**
+
+| 反馈 | 结论 | 处理 |
+| :--- | :--- | :--- |
+| 登录成功却弹「验证码已过期，请点击图片刷新」 | 🔴 **真 bug**：`LoginView` 同时挂了 `@submit`、`@click`、`@keyup.enter` 三个入口 → **点一次发出 2 次 `/auth/login`**；验证码一次性，第 2 次必然失败 | 去掉 `@click` 与 `@keyup.enter`，只留 `native-type="submit"` → `@submit.prevent`；加 `if (loading.value) return`；`InitAdminView` 同修（D43） |
+| 同时弹「Token 已过期」 | 是**踢线时那条 40100 的提示**，属正常行为；但多个并发请求会连弹多条 | 拦截器改为「一次重定向只提示一条」（复用重定向重入锁） |
+| 点「笔记」任何筛选都显示「请求的资源不存在」 | 🟡 **不是代码 bug**：用户 8080 的后端进程启动于 20:19，而 T5 的 `NoteController` 是 20:35 才写 → **旧进程里没有 `/note` 接口**，带有效 token 走到路由层 → `40400`（HTTP 200、控制台无报错） | 需**重启 8080 的后端进程**（D44）；已在交接文档加环境提醒 |
+
+**实测证据（修复前后各跑一次，同一点击动作）**：
+
+```
+修复前：1. POST /api/auth/login      修复后：1. POST /api/auth/login
+        2. POST /api/auth/login              （仅 1 次 ✅）
+        >>> 次数 = 2 ❌ 重复提交
+```
+
+**回归结果（修复后）**：T3 页面 **17/17**、T6 页面 **31/31** 全绿。
+其中 T3 的 `V12a/V12b` 两条断言**已按新行为改写**（T3 时 `/notes` 不发请求，所以「无效 token 也能进」；
+T6 起会调 `/note/page`，故改为「被拦回登录页 + token 被清」）。
+
+#### T6 验证指引（PowerShell 5.1 友好）
+
+```powershell
+$root = "F:\Project\Own Project\Personal-Knowledge-Base"
+$mysql = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
+
+# ---------- 1. 只读核对 ----------
+# 表单是否只有一份（T6 的硬要求：抽屉与全屏页复用）
+Get-ChildItem "$root\web\src" -Recurse -Include *.vue | Select-String -Pattern 'NoteForm' -List |
+  ForEach-Object { "  " + $_.Path.Replace("$root\", '') }
+# 期望：3 处（NoteForm 本体 / NoteDrawer / NoteDetailView）
+
+# 抽屉状态是否收口在 composable
+Select-String -Path "$root\web\src\composables\useNoteDrawer.js" -Pattern 'const visible|const version'
+
+# 40100 是否同时清 store（关键：只清 localStorage 会落首页）
+Select-String -Path "$root\web\src\api\request.js" -Pattern 'useUserStore|clear\(\)'
+
+# ---------- 2. 起后端 + 预览站，用你自己的账号手验 ----------
+# ⚠️ 顺序：先确认 8090 无占用再构建（旧进程占 jar 会让 mvn clean 失败）
+Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+cd "$root\server"
+Remove-Item env:SERVER__PORT -ErrorAction SilentlyContinue
+Remove-Item env:SERVER__HOST -ErrorAction SilentlyContinue
+& "E:\MAVEN\apache-maven-3.6.3\bin\mvn.cmd" clean package -DskipTests
+if ($LASTEXITCODE -ne 0) { throw "构建失败（多半是旧进程占着 jar）" }
+Start-Process -FilePath "C:\Program Files\Java\jdk-17\bin\java.exe" `
+  -ArgumentList '-jar','target\pkb-server-1.0.0.jar','--server.port=8090' `
+  -WorkingDirectory "$root\server" -WindowStyle Hidden
+
+cd "$root\web"; npm run build
+# 用你的 8080 当后端 + 5173 dev 也行，下面这套用隔离栈更干净
+cd "$root\.workbuddy\skills\pkb-verify"
+Start-Process -FilePath "node.exe" -ArgumentList "scripts\preview_server.cjs" -WindowStyle Hidden
+# 打开 http://127.0.0.1:5180 用你自己的账号登录
+
+# ---------- 3. 手验清单 ----------
+# ① 列表：应看到卡片流；「全部/待整理/已归档」里**当前那个是蓝色高亮**
+# ② 桌面点卡片 → 右侧抽屉打开，标题/正文/格式徽标都对；右上角**有 ×**
+# ③ 改标题 → 出现「有未保存的修改」→ 点 × → 弹确认
+# ④ 新建笔记 → 点保存 → 再点一次保存 → 列表里**只多一条**
+# ⑤ 窗口缩到 375 → 点卡片 → 跳到 /note/{id} 全屏页；左右不出现横向滚动
+# ⑥ F12 → Application → localStorage 把 pkb_token 改成乱码 → 刷新 /notes
+#    期望：自动跳 /login?redirect=/notes，且 pkb_token 已消失
+```
+
+**验收判据**：
+1. TAB 两档（桌面/手机）都能列表 → 打开 → 编辑 → 保存
+2. **抽屉与全屏页是同一份表单**（字段、校验、按钮完全一致）
+3. 「全部」筛选默认就是高亮的
+4. 置顶/归档**不会**把笔记挤到「最近」最前面
+5. token 失效 → 自动回登录页并带 redirect
 
 ---
 
-### T7 双格式编辑 ⬜
+### T7 双格式编辑 ✅
 
-> 状态：**未开始**。**开工前必须先出技术方案并经用户确认**（涉及技术选型，铁律 2）。
+> 状态：**已完成（2026-10-17）**。接口侧 **34/34** + 页面侧 **40/40** 全绿；
+> 回归 t3 **17/17** / t5 **33/33** / t6 **31/31** 全部保持绿（共 155 条断言）。
+> 选型在开工前由用户拍板（PRD 第十二章 #1 → `md-editor-v3 7.1.0`）。
 
 - **覆盖**：P-004（双格式编辑）
-- **依赖**：T6
-- **范围**：md 编辑器接入 + 富文本编辑器复用 + 后端按格式分流清洗 + 前端渲染前 DOMPurify（**md 产物同样要过**）
-- **开工前需用户拍板（开工阻塞项）**（PRD 第十二章 **#1**）：Markdown 编辑器选型 —— 候选 `md-editor-v3`（倾向）/ `Vditor` / `CodeMirror + marked`
-- **风险**：R2（选型不当导致表格 / 代码块异常，而这正是核心场景）、R5（md 渲染路径 XSS 穿透）
-- **技术方案**：⬜ 待开工前产出
+- **依赖**：T6 ✅
+- **范围**：md 编辑器接入 + 富文本编辑器**真正接上**（依赖得先补回来）+ 后端按格式分流清洗 + 两端产物过 DOMPurify / jsoup
+
+#### T7 技术方案（✅ 用户已拍板 2026-10-17）
+
+**① 选型（PRD #1，已关闭 → 附录 C.1）**
+
+| 候选 | 结论与理由 |
+| :--- | :--- |
+| **`md-editor-v3 7.1.0`** | ✅ **选用**：Vue3 原生（peer `vue ^3.5.3`，本机 3.5.43）、底层 markdown-it + CodeMirror 6、表格/代码块/列表开箱；**有 `sanitize(html) => html` 钩子**（渲染后、插入 DOM 前），可直接挂 DOMPurify —— 这是另外两个方案给不了的接点 |
+| `Vditor 4.0.0` | ❌ 解包 23.6 MB；渲染由自家引擎直接写 DOM，DOMPurify 只能「渲染完再扫 DOM」，不干净 |
+| `CodeMirror + marked` | ❌ 工具栏、表格插入、预览都要自造，R2（表格/代码块渲染）风险最高 |
+
+⚠️ **选型的代价（实测确认，不是推断）**：它默认从 unpkg CDN 懒加载 highlight.js / prettier / screenfull / katex / mermaid。
+本项目单机自用、可能完全离线 → 必须本地化：注入本地 `highlight.js` 实例（给了 `instance` 后不再插 CDN 的 `<link>`），
+其余 CDN 能力全关（`no-prettier` / `no-mermaid` / `no-katex` / `no-echarts` / `no-upload-img`），工具栏按白名单收窄。
+
+**② 清洗位置（本轮最关键的约定）**
+
+| 阶段 | md（0） | html（1） |
+| :--- | :--- | :--- |
+| 提交前（前端） | **不动原文**（动了就破坏 Markdown 语法） | `sanitizeHtml()`（严格档，不给 `class`） |
+| 入库前（后端） | 只算 `content_text`（方案 A 去标记） | `HtmlSanitizer.cleanForStore()`，**再用清洗后的内容**算 `content_text` |
+| 展示 / 预览 | 编辑器内置渲染 → `sanitize` 钩子 → **markdown 档 DOMPurify** | 编辑器内直接编辑（内容已在上一步洗过） |
+| 格式切换 | UI 只在**新建态**给选择；保存后只剩只读徽标；后端 T5 已拦（40000） | 同左 |
+
+**③ 前端接入（4 个文件）**
+
+- `MarkdownEditor.vue`：包装 `MdEditor`，本地 hljs + `sanitizeMarkdownHtml` + 工具栏白名单（去 图片/公式/图表/全屏/GitHub/保存/目录/htmlPreview）。
+- `NoteForm.vue`：按 `contentFormat` 分流（两个编辑器都 `defineAsyncComponent` 懒加载）；新建态格式选择；html 提交前清洗。
+- `sanitizeHtml.js`：新增 **markdown 档**（放行 `class` 并按前缀 `hljs-` / `md-editor-` / `language-` 收敛）—— 沿用富文本档会把代码高亮类名剥光。
+- `RichTextEditor.vue`：工具栏白名单化 + 初始化静默期（原因见下方「实现结果」③ 的两个真问题）。
+
+**④ 本轮不做（防越界）**
+
+❌ 图片上传（T11，`uploadImage` 仍未注入、图片菜单已隐藏）｜❌ 项目/标签（T8）｜❌ 搜索高亮（T10）｜
+❌ md 的目录 / 公式 / 图表 / Mermaid（工具栏剔除，且这些能力会拉 CDN 资源）
 
 #### T7 实现结果
 
-⬜ 未开始。
+> 状态：**已完成（2026-10-17）**。均为真实执行记录（隔离栈 8090 + 预览站 5180）。
+
+**① 交付物（10 个文件：3 新增 = 1 组件 + 2 脚本；7 修改 = 业务 4 + 依赖 2 + 旧脚本 1）**
+
+| 文件 | 说明 |
+| :--- | :--- |
+| `web/package.json` / `package-lock.json` | + `md-editor-v3@7.1.0`、`highlight.js@11.12.0`、`@wangeditor-next/editor@6.4.2`、`@wangeditor-next/editor-for-vue@6.4.2`（后两个版本对齐 OSC lockfile 的实测值） |
+| `web/src/components/MarkdownEditor.vue` | **新增**：md 编辑器唯一封装（本地 hljs、DOMPurify 钩子、精简工具栏、375 换行） |
+| `web/src/components/NoteForm.vue` | 按格式分流编辑器；新建态格式选择（单向绑定 + 清空确认）；html 提交前清洗；懒加载 |
+| `web/src/components/RichTextEditor.vue` | 工具栏白名单（21 项）；初始化静默期 + 空内容归一 |
+| `web/src/utils/sanitizeHtml.js` | 新增 markdown 档（放行并收敛 `class`） |
+| `server/.../service/impl/NoteServiceImpl.java` | html 入库前 jsoup 清洗；`content_text` 用清洗后内容算；html 空判定用 `hasVisibleContent`（只贴图合法） |
+| `.workbuddy/.../scripts/t7_format_verify.cjs` | **新增**：接口侧 34 项 |
+| `.workbuddy/.../scripts/t7_page_verify.cjs` | **新增**：页面侧 40 项（含 XSS、渲染、375、格式切换） |
+| `.workbuddy/.../scripts/t6_page_verify.cjs` | 适配 T7：正文从 `textarea` 改为 `.cm-content`；异常路径改为硬退（见 ④） |
+
+**② 实测：接口 34/34 + 页面 40/40，回归 155 条全绿**
+
+| 组 | 关键实测 |
+| :--- | :--- |
+| 接口（`t7_format_verify`） | md 原样入库（142 字符逐字节一致）；md 去标记（无 `#` / `**` / 围栏 / URL / 图片，**代码内容保留**）；html 入库后无 `<script>` / `onerror` / `javascript:` / 站外图片，`text-align` 保留、`position` 被剥、`rel=noopener` 已补；`content_text` = `正文 加粗 点我 单元格 第二段`（不吃脚本）；更新路径同样清洗且同步搜索列；**只改标题不丢正文/搜索列（R1，html 版）**；清洗后为空 + 空标题 → `40000`；只贴图 + 空标题 → 允许 |
+| 页面（`t7_page_verify`） | 抽屉 720px 打开、md/富文本按格式分流；预览内 `table=1 / pre=1 / code=1 / hljs 高亮 4 段`；md 里 `<script>` 不执行（`window.__t7_xss=undefined`）、无 script 节点、无 `javascript:` 链接；html 笔记 `<script>` 已在入库前剥掉；打开笔记**不误报**「有未保存的修改」；新建态格式选择默认 md 高亮；**空正文来回切换不被写入 `<p><br></p>`**；**非空正文切换 → 弹确认，取消后格式与正文都保留**；连点两次保存只创建 1 条；375 宽无横向滚动、md 工具栏换行（76px）后所有按钮可达 |
+| 落库（SQL 直查） | `note.content LIKE '%<script%'` = **0**；`%onerror%` = **0**；`%javascript:%` = **0**；md 有正文但 `content_text` 为空 = **0**；html 有文字但搜索列为空 = **0**；只有图片的 html 行 = **1**（设计允许，无可搜文字） |
+
+**③ 🔴 实测抓到 3 个真问题（全部已修）**
+
+1. **打开 html 笔记立刻显示「有未保存的修改」** —— wangEditor 初始化会把入库 HTML 按 Slate 重新序列化，
+   与后端存的字符串不完全一致，被脏检查当成用户输入（关闭时还会莫名弹确认框）。
+   **修复**：编辑器加 250ms 初始化静默期，结束时把「编辑器认下来的 HTML」作为新基线（`normalize` 事件）
+   交给 `NoteForm` 重置快照。**顺带**：空内容时 wangEditor 给的是 `<p><br></p>`（非空字符串），
+   必须归一成 `''`，否则「md → 富文本 → md」的空表单会被写成 `<p><br></p>` 的 md 源码。
+2. **格式切换的确认框「弹晚了」** —— `v-model` 在 `@change` 之前就把 `contentFormat` 改了，
+   于是确认框还没选、编辑器已经换过去：md 正文被当成 html 喂给富文本编辑器。
+   **修复**：格式选择改**单向绑定**（`:model-value` + `@update:model-value`），用户点「取消」时格式根本没变。
+3. **md 工具栏在 375 宽被藏掉一半** —— 默认是「单行 + 横向滚动」，预览/撤销/重做在屏幕外，手机没有可见滚动条。
+   **修复**：窄屏让工具栏换行（3 行、76px），所有按钮可达，整页仍无横向滚动。
+
+**④ 验证脚本自身踩的坑（写进 SKILL，避免下次再花一轮）**
+
+- 在 `ev(\`...\`)` 的**模板字符串里写注释带了反引号** → 模板字符串提前截断 → Node 侧 `content is not defined`；
+  而脚本的 `.catch` 只设 `exitCode` 不退出，Chrome 子进程与 WebSocket 吊住事件循环 → **表现为「假死、无任何输出」**。
+  → 规则：① 页面表达式里的注释禁止出现反引号；② 验证脚本的异常路径必须 `chrome.kill()` + `process.exit()`。
+- t6 回归因正文从 `textarea` 换成 CodeMirror 而失败（`contentLen=0`）——是**断言过时**不是回归；
+  已按新实现改写（`.cm-content`），并把「新建」用例改成只填标题（本用例只验重复创建）。
+
+**⑤ 测试数据与进程收尾**
+
+| 项 | 结果 |
+| :--- | :--- |
+| 测试账号 `13900000001` | 已硬删；`user` 表 **1 行**（用户真账号，未动） |
+| `note` / `tag` / `note_tag` / `attachment` | 全 **0** 行 |
+| Redis `pkb:*` | **0** 个 key |
+| 归档库 `osc.user` | 仍 **93** |
+| 隔离栈 8090 / 5180 | 已停、端口已释放 |
+| 用户自己的 8080 / 5173 | **全程未动**（交付时探活均 200） |
+
+**⑥ 遗留到后续任务点的**
+
+- **图片**：html 正文里的图片仍以对象 key（`attachments/images/...`）存库，渲染时还没有公开前缀 →
+  归 **T11**（`cleanForOutput` 拼前缀 + 上传通道 + 工具栏图片入口一起做）。
+- **真机观感 / IME**：编辑器在真手机、以及中文输入法组词下的表现仍需人工确认（见交接文档 §9.3 #2 #4）。
+- **大文档性能**：12,000 字符 md 保存与预览正常，但 10 万级未压测（V0.1 不做承诺）。
+
+#### T7 验证指引（PowerShell 5.1 友好）
+
+```powershell
+$root = "F:\Project\Own Project\Personal-Knowledge-Base"
+$mysql = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
+$redis = "C:\Program Files\Redis\redis-cli.exe"
+
+# ---------- 1. 只读核对：依赖与清洗位置 ----------
+# ① 两个编辑器依赖都在（版本要对齐 6.4.2 / 7.1.0）
+Select-String -Path "$root\web\package.json" -Pattern 'md-editor-v3|wangeditor|highlight'
+# ② html 清洗只发生在 Service 层（Controller/Mapper 里不该出现）
+Select-String -Path "$root\server\src\main\java\com\pkb\**\*.java" -Pattern 'cleanForStore' -List |
+  ForEach-Object { "  " + (Split-Path $_.Path -Leaf) }
+# 期望：只有 NoteServiceImpl.java（HtmlSanitizer 本体是实现）
+
+# ---------- 2. 起隔离栈（先确认 8090 空闲）----------
+Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+cd "$root\server"
+Remove-Item env:SERVER__PORT -ErrorAction SilentlyContinue
+Remove-Item env:SERVER__HOST -ErrorAction SilentlyContinue
+& "E:\MAVEN\apache-maven-3.6.3\bin\mvn.cmd" -B package -DskipTests -q
+if ($LASTEXITCODE -ne 0) { throw "后端构建失败" }
+Start-Process -FilePath "C:\Program Files\Java\jdk-17\bin\java.exe" `
+  -ArgumentList '-jar','target\pkb-server-1.0.0.jar','--server.port=8090' `
+  -WorkingDirectory "$root\server" -WindowStyle Hidden
+cd "$root\web"; npm run build; if ($LASTEXITCODE -ne 0) { throw "前端构建失败" }
+cd "$root\.workbuddy\skills\pkb-verify"
+Start-Process -FilePath "node.exe" -ArgumentList "scripts\preview_server.cjs" -WindowStyle Hidden
+
+# ---------- 3. 跑 T7 两条（夹具账号由 §9.1 的第 ① 步建）----------
+$env:PKB_API_BASE = "http://127.0.0.1:8090"
+$env:PKB_PREVIEW_ORIGIN = "http://127.0.0.1:5180"
+node .\scripts\t7_format_verify.cjs   # 接口 34 项
+node .\scripts\t7_page_verify.cjs     # 页面 40 项（截图落在 .workbuddy\verify\t7\）
+
+# ---------- 4. 落库核对（跑完 t7_format 立刻查，别先清库）----------
+& $mysql --user=root --password=root --skip-column-names --default-character-set=utf8mb4 `
+  "--execute=USE pkb; SELECT COUNT(*) FROM note WHERE content LIKE '%<script%';"                    # 期望 0
+& $mysql --user=root --password=root --skip-column-names "--execute=USE pkb; SELECT COUNT(*) FROM note WHERE content_format=0 AND content<>'' AND (content_text IS NULL OR content_text='');"   # 期望 0
+& $mysql --user=root --password=root --skip-column-names "--execute=USE pkb; SELECT COUNT(*) FROM note WHERE content_format=1 AND content<>'' AND content NOT LIKE '%<img%' AND (content_text IS NULL OR content_text='');"  # 期望 0
+
+# ---------- 5. 收尾（清测试数据 + 停隔离栈）----------
+& $mysql --user=root --password=root "--execute=USE pkb; DELETE FROM note_tag; DELETE FROM attachment; DELETE FROM note; DELETE FROM user WHERE phone='13900000001';"
+& $redis -h 127.0.0.1 -p 6379 --scan --pattern 'pkb:*' |
+  ForEach-Object { & $redis -h 127.0.0.1 -p 6379 DEL $_ | Out-Null }
+Get-NetTCPConnection -LocalPort 8090,5180 -State Listen -ErrorAction SilentlyContinue |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+```
 
 ---
 
@@ -1460,6 +1801,19 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8080/note/$($created.data.id)/unarchive
 | D35 | **公开页的路由结构** | **每个公开页各自挂 `PublicLayout`**（`path: '/login'` + 子路由 `path: ''`；`path: '/init'` + 子路由 `path: ''`），**禁止**把它们放进一个 `path: '/'` 的父记录。理由：与 `AppShell` 的 `path: '/'` 撞车后，Vue Router 取先声明者 → `/` 渲染成「PublicLayout + 空 router-view」= 页头页脚 + 空白（2026-10-17 用户截图抓到的真实 bug）。另：守卫判定引导页**用路由名 `initAdmin`**，不用 `to.path === '/init'`（后者漏掉 `/init/`） | T4 |
 | D36 | **更新时算 `content_text` 必须用「最终生效内容」** | `update()` 里**不能**用 `patch.content` 去算 —— 请求只改标题/置顶时不带 content，`patch.content` 为 null → `build(null)` 返回 `""` → **把已有搜索列覆盖成空**（R1 真实踩到）。正解：`finalContent = request.content != null ? patch.getContent() : note.getContent()`，用它算。配套回归断言：只改标题后正文不丢、列表 `excerpt` 必须**非空**、库里有 content 时 `content_text` 不得为空 | T5 |
 | D37 | **本地验证的固定顺序** | **停进程 → 构建 → 检查退出码为 0 →（可选）看 jar 时间戳 → 起新进程 → 再验证**。T5 实测：旧进程占着 jar 时 `mvn clean` 失败，而脚本没查退出码就继续跑 → 拿旧 jar 验证 → 假失败，白跑一轮 | 通用 |
+| D38 | **归档 / 取回 / 置顶不刷 `updated_at`** | 三者都是**状态流转，不算「编辑过」**，不该把笔记顶到「最近」列最前面（PRD P-005 曾标为待确认，T6 定稿）。⚠️ 实现要点：无实体更新走 `update(null, wrapper)` 时，**必须显式把 `updated_at` 写回原值** —— 表上带 `ON UPDATE CURRENT_TIMESTAMP`，**不显式赋值 MySQL 会自动刷成当前时间**，写 `now` 更是直接刷掉 | T6 |
+| D39 | **列表排序必须带兜底键** | 排序口径 = **`pinned DESC, updated_at DESC, id DESC`**。`updated_at` 是 DATETIME（秒级），同一秒建的笔记时间完全相同 → 没有 `id DESC` 兜底时 MySQL 返回顺序**不确定**，列表会在两次请求间自行跳动（T6 实测） | T6 / T9 |
+| D40 | **40100 必须同时清 Pinia 登录态** | `request.js` 的 `redirectToLogin()` 里**只清 `localStorage` 是不够的**：路由守卫读的是 store 里的 `token` ref，它仍有值 → 守卫认为「已登录」→ 把 `/login` 又弹回首页，表现为「token 失效后落在首页」。必须 `useUserStore().clear()` + 清持久化 + `router.replace('/login?redirect=…')` | T6 |
+| D41 | **筛选组别用 `null` 当「全部」** | `el-radio-group` 用 `modelValue === value` 比较，`null` 会被当成「未选中」→ **所有按钮都不高亮**，用户看不出当前筛选（功能却正常，极难发现）。用字符串哨兵（如 `'all'`），提交后端时再映射回 `null` | T6 |
+| D42 | **抽屉必须有可见的关闭入口** | 不要图省事用 `:with-header="false"` —— 那样只能靠 Esc / 点遮罩关闭，用户找不到出口。保留标题栏 + 关闭按钮，并用 `:before-close` 做未保存拦截 | T6 |
+| D43 | **表单提交只能有一个入口** | `<el-form @submit.prevent="onSubmit">` 与 `<el-button native-type="submit">` 已构成提交链路时，**绝不能再给按钮加 `@click="onSubmit"`、也不能给输入框加 `@keyup.enter="onSubmit"`** —— 那会让一次点击走两条路径、发出两次请求。登录场景尤其致命：验证码**一次性**，第 2 次请求必然报「验证码已过期」，而第 1 次其实已登录成功（2026-10-17 用户实测：点一次发出 2 次 `/auth/login`）。另在提交函数首行加 `if (loading.value) return` 兜底 | T6 |
+| D44 | **改完后端必须重启 8080 的进程** | 后端进程跑旧代码时，前端调新接口会拿到 `40400 请求的资源不存在`（**HTTP 仍是 200、控制台无报错**），极易误判为前端 bug。自查：`/health` 的 `uptime` + 对比源码文件修改时间。同理：**`mvn clean` 前必须先停掉占用 jar 的进程** | 通用 |
+| D45 | **html 清洗放在 Service 且「先清洗、再算 content_text」** | `NoteServiceImpl` 在 create / update 里调 `HtmlSanitizer.cleanForStore()`；**顺序不能反** —— 先用原文算搜索列会把 `<script>` 里的文本吃进 `content_text`。md 分支**原样返回**（Markdown 源码过 HTML 清洗会破坏语法），md 的防护在渲染端（D47）。另：html 的「正文是否为空」用 `hasVisibleContent`（文本或 img），否则「只贴一张图」的合法笔记会被误杀 | T7 |
+| D46 | **md 里的原生 HTML 默认转义、不渲染** | markdown-it 保持 `html: false`；并把 md-editor 的 `htmlPreview` 工具栏**摘掉**（它是「渲染原始 HTML」的开关，既与策略冲突又是 XSS 面）。要富文本排版请用 html 格式笔记 —— 一条笔记一种格式（铁律①） | T7 |
+| D47 | **md 渲染产物要过「markdown 档」DOMPurify，不能沿用富文本档** | 富文本档的 `ALLOWED_ATTR` 不含 `class`（防外部样式污染），但 md 渲染产物里代码高亮靠 `hljs-*`、代码块外壳靠 `md-editor-code-block` —— 沿用严格档会把它们一起剥掉，**代码高亮与代码块样式直接失效**。故 `sanitizeHtml.js` 增 markdown 档：标签/协议白名单不变，仅放行 `class` 并用钩子按 `hljs-` / `md-editor-` / `language-` 前缀收敛 | T7 |
+| D48 | **富文本工具栏白名单化（只留「保存后仍存活」的菜单）** | jsoup 的 `style` 白名单只放行 `text-align / text-indent / color / background-color`，`class`/`id` 一律剥。默认工具栏的「字号/字体/行高/缩进/波浪线/着重号/格式刷」产生的正是被剥掉的样式 → **编辑时看到、保存后消失**（违反 NFR「绝不允许以为存了其实没存」）。故 `RichTextEditor` 用 `toolbarKeys` 显式收窄为 21 项 | T7 |
+| D49 | **编辑器的「初始化规范化」不算用户编辑** | wangEditor 初始化会把入库 HTML 按 Slate 重新序列化（且空内容给 `<p><br></p>`，是非空字符串）→ 直接当输入会「一打开就显示有未保存的修改」、并污染空表单。故：① 编辑器创建后 250ms **静默期**，期间不 emit `update:modelValue`；② 静默结束把「编辑器认下来的 HTML」经 `normalize` 事件交给表单**重置基线**；③ 空 HTML（仅有空段落/换行，且无 `img`）归一成 `''`；④ 格式选择用**单向绑定**（`:model-value` + `@update:model-value`），否则 `v-model` 会在 `@change` 前就换掉编辑器、确认框形同虚设 | T7 |
+| D50 | **验证脚本两条硬规矩** | ① 页面表达式（模板字符串）里的**注释禁止出现反引号** —— 会提前截断模板字符串，Node 侧报 `content is not defined`；② 脚本的 `.catch` 必须 `chrome.kill()` + `process.exit()`，只设 `exitCode` 会让 Chrome 子进程与 WebSocket 吊住事件循环 → **表现为「假死、零输出」**（2026-10-17 实际卡掉一轮，见交接文档 §四 T7 坑） | 通用 |
 
 ---
 
