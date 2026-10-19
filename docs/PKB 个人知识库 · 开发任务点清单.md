@@ -68,7 +68,7 @@
 | T6 | 笔记列表 + 详情（前端，drawer / 全屏页 + 复用同一份表单） | P-002 / P-003 | T5 | ✅ **已完成** |
 | T7 | 双格式编辑（md 编辑器选型 + 富文本复用 + 分流清洗） | P-004 | T6 | ✅ **已完成** |
 | T8 | 项目 / 标签（CRUD + 关联 + **项目单选后端兜底** + 计数） | P-006 / P-007 | T5 | ✅ **已完成** |
-| T9 | 首页工作台（桌面三列各自滚动 + 手机 3 Tab + 状态条） | P-010 | T6 | ⬜ 未开始 |
+| T9 | 首页工作台（桌面三列各自滚动 + 手机 3 Tab + 状态条） | P-010 | T6 | ✅ **已完成** |
 | T10 | 搜索（只打 `title + content_text`） | P-008 | T5 | ⬜ 未开始 |
 | T11 | 附件（通用文件上传 + 非图片校验 + MinIO） | P-009 | T5 | ⬜ 未开始 |
 | T12 | 联调打磨（三档无横向滚动 + `content_text` 全量核对 + 备份） | NFR / M4 | 全部 | ⬜ 未开始 |
@@ -1796,20 +1796,142 @@ Get-NetTCPConnection -LocalPort 8090,5180 -State Listen -ErrorAction SilentlyCon
 
 ---
 
-### T9 首页工作台 ⬜
+### T9 首页工作台 ✅
 
-> 状态：**未开始**。
+> 状态：**已完成（2026-10-19）**。接口侧 **15/15** + 页面侧 **32/32**；
+> 全量回归 **286 条断言**全绿（t3 17 / t5 33 / t6 31 / t7 34+40 / t8 57+27 / t9 15+32）。
+> 「本周」口径由用户拍板（PRD #11 → **本周一 00:00 起算、本周新建数**）。
 
-- **覆盖**：P-010（首页工作台）
-- **依赖**：T6
-- **范围**：桌面顶部输入框（回车即建 inbox，不跳页）+ 状态条 + 三列（项目 / 最近 / 待整理）**各自滚动**；手机顶部输入框常驻 + 精简状态条 + 底部 3 Tab（切 Tab 只换内容区）
-- **开工前需用户拍板**（PRD 第十二章）：#11 「本周 +9」口径
-- **风险**：R3（嵌套滚动失效 —— `min-height:0` 逐层加）
-- **技术方案**：⬜ 待开工前产出
+- **覆盖**：P-010（首页工作台）+ P-001 的首页快速记录入口
+- **依赖**：T6（列表卡片与抽屉）、T8（项目列与计数）
+- **范围**：桌面顶部输入框（回车即建 inbox、不跳页）+ 状态条（4 项可点）+ 三列（项目 / 最近 / 待整理）各自滚动；手机顶部输入框常驻 + 状态条横滑 + 底部 3 Tab（只换内容区）
+
+#### T9 技术方案（✅ 已拍板 #11 2026-10-19）
+
+**① 接口：新增 `GET /note/stats`（一次返回 4 项）**
+
+| 字段 | 口径 |
+| :--- | :--- |
+| `inbox` / `archived` | `status=0` / `status=1` 的笔记数（`@TableLogic` 自动排除已删） |
+| `projects` | `tag.type=1` 且未删除的项目数 |
+| `weekAdded` | **本周一 00:00 起**新建的笔记数（按 `created_at`，不区分 status）—— PRD #11 拍板 |
+
+列表接口 `GET /note/page` 增加 `weekOnly`：只返回本周新建（状态条「本周 +N」点进来就带这个参数）。
+⚠️ 刻意**不给首页 4 个接口**：状态条一次请求拿全，避免首屏打 4 枪。
+
+**② 滚动模型（照 D34 实测结论，**不要照抄 PRD 旧说法**）**
+
+- 首页 `height:100% + min-height:0`，**自己不再滚**（否则三列的 overflow 没有确定高度）；
+- 三列的 `.home-column__body` 各带 `overflow-y:auto` —— **这才是承重件**；
+- `.app-main` 的 `scrollTop` 必须保持 0（验收里专门断言：滚列不带动整页）。
+
+**③ 快速记录（P-001 的每条分支都要落地）**
+
+| 分支 | 实现 |
+| :--- | :--- |
+| 回车建 inbox、不跳页 | `createNote({title:text, content:text, contentFormat})`；成功后**不 router.push** |
+| 清空并保持焦点 | 注意：提交中输入框是 `disabled`，**对 disabled 元素 focus 无效** → 必须等 `creating` 复位后再 `focus()`（T9 实测踩到） |
+| 空输入 | 输入框抖动提示，**不创建**、不弹错误框 |
+| 连击回车 | `creating` 守卫（提交中禁用 + 早退），实测连按两次只建 1 条 |
+| 失败 | **保留输入**、toast 报错、可重试（绝不 clear） |
+| 格式按钮 | 只影响此后新建；状态存 `sessionStorage('pkb_home_format')` |
+| 中文输入法 | `compositionstart/end` + `event.isComposing` 双保险，**组词中的回车不提交** |
+
+**④ 前端结构**
+
+- `HomeView.vue` 重写：桌面「composer + 状态条 + 三列 grid」，手机「composer + 状态条横滑 + 内容区 + 底部 3 Tab」；
+- 三列数据：项目列 `GET /tag?type=1`（含计数）、最近列 `GET /note/page?size=20`、待整理列 `GET /note/page?status=0&size=20`；
+- 点笔记：桌面 `useNoteDrawer().open(id)`、手机 `/note/:id`（与列表页同一套）；抽屉里改完靠 `useNoteDrawer().version` 刷新首页；
+- `NotesView` 支持从首页带 query 进入：`status=0/1`、`week=1`（并显示「本周新增」标记）。
+
+**⑤ 本轮不做**
+
+❌ 内联搜索框（P-008，随 **T10** 接入；不放假入口）｜❌ 三列的「加载更多」（首页只承载「看一眼」，全量在列表页）｜❌ 手机 Tab 与路由联动（D33 明确是内容级）
 
 #### T9 实现结果
 
-⬜ 未开始。
+> 状态：**已完成（2026-10-19）**。均为真实执行记录（隔离栈 8090 + 预览站 5180）。
+
+**① 交付物（6 个文件：2 新增 / 4 修改）**
+
+| 文件 | 说明 |
+| :--- | :--- |
+| `server/.../dto/NoteStatsVO.java` | **新增**：状态条四项出参 |
+| `server/.../dto/NoteQuery.java` · `NoteService` · `NoteServiceImpl` · `NoteController` | **修改**：`stats()` + `/note/stats`；`weekOnly` 筛选；`weekStart()` 用 `LocalDate.now().with(DayOfWeek.MONDAY)` |
+| `web/src/views/HomeView.vue` | **重写**：快速记录 + 状态条 + 三列/三 Tab |
+| `web/src/views/notes/NotesView.vue` | 支持 `status` / `week` query（状态条跳转落地），清除筛选一并复位 |
+| `web/src/api/note.js` | `getNoteStats()` + 参数注释 |
+| `.workbuddy/.../t9_api_verify.cjs` · `t9_page_verify.cjs` | **新增**：接口 15 项 / 页面 32 项 |
+
+**② 实测：接口 15/15 + 页面 32/32；全量回归 286 条全绿**
+
+| 组 | 关键实测 |
+| :--- | :--- |
+| 接口 | 四项统计类型正确；**2020 年的老笔记不计入「本周」**（`weekAdded=0` 而 `inbox=1`）；新建 2 条 → 待整理 +2、本周 +2；归档一条 → 待整理 −1、已归档 +1、**本周不变**（归档不算新建）；建项目 → 项目 +1；`weekOnly` 结果数与 `weekAdded` 一致且不含老笔记；`weekOnly + status=0` 组合生效；删除后统计回落；未登录 40100 |
+| 页面（桌面） | 首页有输入框 / 状态条 4 项 / 三列标题正确；**状态条数字与接口逐一相等**；回车建笔记**不跳页**、输入框**清空且保持聚焦**、toast 文案正确、新笔记立刻出现在「待整理」列、状态条 +1；空输入不创建；**连击回车只建 1 条**；格式按钮切到富文本后新建的笔记 `contentFormat=1`；**组词中的回车不提交**；**滚「最近」列不影响「待整理」，且整页不动**；**窗口压到 400px 高仍可列内滚动**；点列内笔记 → 抽屉打开并回填标题；点「待整理」→ `/notes?status=0`；点「项目」→ `/projects` |
+| 页面（手机 375） | 输入框常驻 + 3 Tab（最近/待整理/项目）、默认「最近」；**切 Tab 路由不变（仍 `/`）**；滚动内容区后输入框位置不变（常驻）；手机回车建笔记成功且不跳页；「项目」Tab 展示项目；**无横向滚动** |
+
+**③ 🔴 实测抓到 1 个真问题（已修）**
+
+- **「回车后保持焦点」失效**：提交时输入框 `disabled`，而 `focus()` 对 disabled 元素**无效**；
+  原实现「`await nextTick()` 后 focus」发生在 `creating=false` 之前 → 焦点丢到 body。
+  **修复**：把 focus 移到 `finally`（`creating` 复位）之后；失败路径也聚焦，方便重试。
+
+**④ 一个截图教训**：第一版桌面截图是在「列已滚动 300px」之后拍的，看起来像「第一条没有标题」，
+实际是行被裁在顶部。**截图前先复位滚动**（已改进脚本）。
+
+**⑤ 与 PRD 的差异（已同步文档）**
+
+- P-010 顶部区的**内联搜索框本轮不做**：P-008 归 T10，先不放假入口；PRD 已加注「随 T10 接入」。
+- PRD P-010「`min-height:0` 不能删」与 T4 实测（D34）冲突，**已改为「每列自带 `overflow-y:auto`」**。
+
+**⑥ 测试数据与进程收尾**
+
+| 项 | 结果 |
+| :--- | :--- |
+| 测试账号 `13900000001` | 已硬删；`user` 表 **1 行**（用户真账号，未动） |
+| `note` / `tag` / `note_tag` / `attachment` | 全 **0** 行 |
+| Redis `pkb:*` | **0** 个 key |
+| `osc.user` | 仍 **93** |
+| 隔离栈 8090 / 5180 | 已停、端口已释放 |
+| 用户实例 | 8082（后端）/ 5173（前端）**全程未动**（交付时仍在监听） |
+
+#### T9 验证指引（PowerShell 5.1 友好）
+
+```powershell
+$root = "F:\Project\Own Project\Personal-Knowledge-Base"
+$mysql = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
+
+# ---------- 1. 只读核对：统计端点与 weekOnly 都在 ----------
+Select-String -Path "$root\server\src\main\java\com\pkb\controller\NoteController.java" -Pattern 'stats|weekOnly'
+Select-String -Path "$root\web\src\views\HomeView.vue" -Pattern 'getNoteStats|home-column__body|home__tab'
+
+# ---------- 2. 起隔离栈（先确认 8090 空闲）----------
+Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+cd "$root\server"
+Remove-Item env:SERVER__PORT -ErrorAction SilentlyContinue
+Remove-Item env:SERVER__HOST -ErrorAction SilentlyContinue
+& "E:\MAVEN\apache-maven-3.6.3\bin\mvn.cmd" -B package -DskipTests -q
+if ($LASTEXITCODE -ne 0) { throw "后端构建失败" }
+Start-Process -FilePath "C:\Program Files\Java\jdk-17\bin\java.exe" `
+  -ArgumentList '-jar','target\pkb-server-1.0.0.jar','--server.port=8090' `
+  -WorkingDirectory "$root\server" -WindowStyle Hidden
+cd "$root\web"; npm run build; if ($LASTEXITCODE -ne 0) { throw "前端构建失败" }
+cd "$root\.workbuddy\skills\pkb-verify"
+Start-Process -FilePath "node.exe" -ArgumentList "scripts\preview_server.cjs" -WindowStyle Hidden
+
+# ---------- 3. 先插一条「很久以前」的笔记，再跑 T9 两条 ----------
+& $mysql --user=root --password=root "--execute=USE pkb; INSERT INTO note (title, content, content_format, content_text, status, pinned, created_at, updated_at) VALUES ('T9-LEGACY-old','老笔记',0,'老笔记',0,0,'2020-01-01 10:00:00','2020-01-01 10:00:00');"
+$env:PKB_API_BASE = "http://127.0.0.1:8090"
+$env:PKB_PREVIEW_ORIGIN = "http://127.0.0.1:5180"
+node .\scripts\t9_api_verify.cjs    # 15 项（含「本周」边界）
+node .\scripts\t9_page_verify.cjs   # 32 项（截图落在 .workbuddy\verify\t9\）
+
+# ---------- 4. 人工看两件事（自动化断言测不出来）----------
+# ① 桌面把窗口高度压到 400px：三列各自能滚、页头不动
+# ② 手机 375：滚动内容区时顶部输入框不消失；底部 3 Tab 点击只换内容区
+```
 
 ---
 
@@ -1944,6 +2066,10 @@ Get-NetTCPConnection -LocalPort 8090,5180 -State Listen -ErrorAction SilentlyCon
 | D54 | **清空类更新必须走 wrapper 显式 set** | `updateById` 会忽略 null 字段 → 「把颜色清空」永远清不掉。改色 / 清色一律 `Wrappers.lambdaUpdate().set(Tag::getColor, …)`。与 D38「置顶/归档显式写回 updated_at」是同一类坑：**想写 null 或想写回原值，都不能走实体更新** | T8 |
 | D55 | **列表筛选先算候选 note_id 集合，不写 join** | 项目单选与标签多选都先由 `note_tag` 算出候选 id：标签 **AND** 用 `GROUP BY note_id HAVING COUNT(DISTINCT tag_id)=N`，项目用单标签查询；多条件时取交集，最后 `IN` 收窄。理由：自定义 join 与 MyBatis-Plus 分页 / `@TableLogic` / `is_deleted=0` 叠加后极易出错，而个人数据量下多一次聚合查询的代价可以忽略。空集合直接返回空页（不查主表） | T8 / T10 |
 | D56 | **`MetaObjectHandler` 一律「有 setter 才填」** | T8 新增的 `note_tag` 两个字段都没有、`tag` 没有 `updated_at`；原来的无条件 `strictInsertFill` 是 T1 踩过的雷（实体没有属性会抛异常）。填充前统一 `metaObject.hasSetter(...)` 判断，新增实体不必回头改配置 | T8 |
+| D57 | **首页统计「一次请求」，且与列表筛选共用同一周口径** | 新增 `GET /note/stats` 一次返回 `inbox / archived / projects / weekAdded`（首页不打 4 枪）；「本周」= **本周一 00:00**（`LocalDate.now().with(DayOfWeek.MONDAY)`），`weekOnly` 列表筛选复用**同一个** `weekStart()` —— 统计与点进去的列表必须一致，否则「+9 点进去只有 8 条」这类问题极难解释 | T9 |
+| D58 | **首页的滚动：页面自己不滚，每列 `overflow-y:auto`** | 首页 `height:100% + min-height:0` 占满 `.app-main` 且不产生整页滚动；三列 body 各自 `overflow-y:auto`（D34 落地点）。**验收项**：滚某列时其余列 `scrollTop` 与 `.app-main.scrollTop` 都必须保持 0 —— 这条能一次性抓住「整页跟着滚」和「列没滚起来」两类回归 | T9 / T12 |
+| D59 | **快速记录的三条实现约束** | ① 输入文字**同时**作为 `title` 与 `content`（单行输入，title 由后端截断 255）；② 提交中输入框 `disabled`，**对 disabled 元素 `focus()` 无效** → 焦点必须在 `creating` 复位之后再恢复；③ 中文输入法用 `compositionstart/end` + `event.isComposing` 双保险，**组词中的回车不提交**；格式按钮状态存 `sessionStorage`（刷新保持，PRD 记为体验目标） | T9 |
+| D60 | **首页三列各自只取 20 条，不做「加载更多」** | PRD P-010 明确首页只承载「看一眼」，全量在列表页；三列各 `size=20`（按冻结排序取头部）。避免首页因为「加载更多」变成第二个列表页，也避免一次拉全量 | T9 |
 
 ---
 
