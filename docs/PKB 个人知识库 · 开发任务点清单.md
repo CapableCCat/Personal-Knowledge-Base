@@ -67,7 +67,7 @@
 | T5 | 笔记 CRUD（后端，含 `content_text` 同步 / 归档 / 取回 / 置顶） | P-001 / P-005 | T2 | ✅ **已完成** |
 | T6 | 笔记列表 + 详情（前端，drawer / 全屏页 + 复用同一份表单） | P-002 / P-003 | T5 | ✅ **已完成** |
 | T7 | 双格式编辑（md 编辑器选型 + 富文本复用 + 分流清洗） | P-004 | T6 | ✅ **已完成** |
-| T8 | 项目 / 标签（CRUD + 关联 + **项目单选后端兜底** + 计数） | P-006 / P-007 | T5 | ⬜ 未开始 |
+| T8 | 项目 / 标签（CRUD + 关联 + **项目单选后端兜底** + 计数） | P-006 / P-007 | T5 | ✅ **已完成** |
 | T9 | 首页工作台（桌面三列各自滚动 + 手机 3 Tab + 状态条） | P-010 | T6 | ⬜ 未开始 |
 | T10 | 搜索（只打 `title + content_text`） | P-008 | T5 | ⬜ 未开始 |
 | T11 | 附件（通用文件上传 + 非图片校验 + MinIO） | P-009 | T5 | ⬜ 未开始 |
@@ -1655,20 +1655,144 @@ Get-NetTCPConnection -LocalPort 8090,5180 -State Listen -ErrorAction SilentlyCon
 
 ---
 
-### T8 项目 / 标签 ⬜
+### T8 项目 / 标签 ✅
 
-> 状态：**未开始**。
+> 状态：**已完成（2026-10-19）**。接口侧 **57/57** + 页面侧 **27/27**；
+> 全量回归 **239 条断言**全绿（t3 17 / t5 33 / t6 31 / t7 接口 34 / t7 页面 40 / t8 接口 57 / t8 页面 27）。
+> 计数口径由用户在开工前拍板（PRD #12 → **全部含待整理**）。
 
-- **覆盖**：P-006（项目管理）、P-007（标签管理）
-- **依赖**：T5
-- **范围**：`tag` CRUD（`type=0` 标签 / `type=1` 项目）+ `note_tag` 关联 + **项目单选后端兜底（已有关联 `type=1` 时替换而非新增）** + 项目卡片计数
-- **开工前需用户拍板**（PRD 第十二章）：#12 项目计数口径
-- **风险**：R4（项目单选在数据层失守，产生脏数据且发现晚）
-- **技术方案**：⬜ 待开工前产出
+- **覆盖**：P-006（项目管理）、P-007（标签管理）；顺带补齐 P-002 里与项目/标签相关的**列表展示与筛选**
+- **依赖**：T5 ✅
+- **范围**：`tag` CRUD（`type=0` 标签 / `type=1` 项目）+ `note_tag` 关联 + **项目单选后端兜底** + 计数 + 列表筛选
+
+#### T8 技术方案（✅ 用户已拍板 #12 2026-10-19）
+
+**① 接口（9 个端点）**
+
+| 方法 | 路径 | 说明 |
+| :--- | :--- | :--- |
+| GET | `/tag?type=0\|1` | 列表（不传 type = 两类都返回，笔记表单一次拿全）；含 `noteCount`，按 `sort, id` 升序 |
+| POST | `/tag` | 新建 `{name, type, color, sort}`；`type` 必填（不给默认值，避免把项目误建成标签） |
+| PUT | `/tag/{id}` | 改名 / 改色 / 改排序；**`type` 不可变** |
+| PUT | `/tag/sort` | 重排：`{type, ids:[…]}` 传该类型下**全部** id 的目标顺序 |
+| DELETE | `/tag/{id}` | 解除全部关联 + 逻辑删除；**返回被解除关联的笔记数** |
+| GET/POST/PUT | `/note` · `/note/{id}` | 请求体新增可选 `associations{projectId, tagIds}`（**同事务原子保存**） |
+| GET | `/note/page` | 新增 `projectId`（单选）/ `tagIds`（多选，**AND**）筛选；列表项带 `project` 与 `tags` |
+
+**② 三条关键设计（都写成了决策，见 §6 D51~D56）**
+
+- **关联「全量替换」而不是增量**：请求带 `associations` → 先清空该笔记在 `note_tag` 的全部行，再按请求重建。
+  —— 这样「一条笔记最多一个项目」在**写入路径上结构成立**，不存在「新增第二个项目」的可能（R4 兜底）。
+  `associations` 为 null（不带）= 完全不动关联，T5/T6 的老调用方不受影响。
+- **筛选不写 join**：先用 `note_tag` 算出候选 `note_id` 集合（标签 AND 用 `HAVING COUNT(DISTINCT tag_id)=N`），
+  再用 `IN` 收窄 —— 避免和 MyBatis-Plus 分页 / 逻辑删除 / 排序兜底混在一起。
+- **计数一次分组查询**：`GROUP BY tag_id` 全表扫一遍，避免管理页 N+1；口径**全部状态（含待整理）**。
+
+**③ 前端**
+
+- `TagManager.vue`：项目页与标签页**共用**（只差 `type` 与文案）；不用 `el-table`（375 会横向滚动），改成换行友好的行列表；
+  排序用**上移/下移**（不引拖拽库），删除确认写明「笔记本身不会被删除」。
+- `NoteForm.vue`：项目单选（可清空）+ 标签多选（`filterable`，>50 可搜索），随主请求一起提交；参与脏检查。
+- `NotesView.vue`：项目 / 标签筛选 + 卡片展示（项目名 + 最多 3 个标签 + `+n`）；
+  从管理页「查看笔记」跳 `/notes?projectId=…` 即按项目过滤（PRD P-006 的「点进项目 = 项目笔记列表」）。
+
+**④ 本轮不做（防越界）**
+
+❌ 批量操作（V0.1 不做）｜❌ 标签合并 / 重命名级联 |❌ 项目元信息（起止时间/进度，PRD 已否决）｜❌ 首页三列（T9）
 
 #### T8 实现结果
 
-⬜ 未开始。
+> 状态：**已完成（2026-10-19）**。均为真实执行记录（隔离栈 8090 + 预览站 5180）。
+
+**① 交付物（后端 15 个文件：10 新增 / 5 修改；前端 8 个：3 新增 / 5 修改）**
+
+| 类别 | 文件 |
+| :--- | :--- |
+| 后端新增 | `TagController` · `TagService` / `TagServiceImpl` · DTO `TagCreateRequest` / `TagUpdateRequest` / `TagSortRequest` / `TagVO` / `TagBriefVO` / `NoteAssociationsRequest` / `TagCountRow` |
+| 后端修改 | `NoteServiceImpl`（关联装配 + 筛选 + 统一出参）· `NoteTagMapper`（两条聚合查询）· `NoteVO` / `NoteListItemVO` / `NoteQuery` / `NoteCreateRequest` / `NoteUpdateRequest`（加字段）· `MybatisPlusConfig`（补 setter 判断，见 ③） |
+| 前端新增 | `api/tag.js` · `components/TagManager.vue` |
+| 前端修改 | `ProjectsView` / `TagsView`（接管理组件）· `NoteForm`（项目单选 + 标签多选）· `NotesView`（筛选 + 卡片展示） |
+| 验证脚本 | `t8_api_verify.cjs`（57 项）· `t8_page_verify.cjs`（27 项） |
+
+**② 实测：接口 57/57 + 页面 27/27；全量回归 239 条全绿**
+
+| 组 | 关键实测 |
+| :--- | :--- |
+| 接口 | 项目/标签 CRUD；同类型重名 → 40000、**不同类型可同名**；非法 type / 颜色 → 40000；改名 / 改色（`color:''` 清空）生效；**项目与标签互换使用 → 40000**；关联全量替换（A→B 只有 B）；只改标题不动关联；`projectId=null` 清项目、`tagIds=[]` 清标签；**新建时带非法关联 → 40000 且笔记不残留（事务回滚）**；项目筛选 / 标签 AND 筛选 / 组合筛选；计数含待整理；删除标签与项目只解关联不删笔记；排重写 0,10,20；未登录 40100 |
+| 页面 | 项目页列出 + 计数（2 条）+ 新建 / 改名 / 上移 / 查看笔记（跳 `/notes?projectId=` 且只列该项目 2 条）/ 删除（确认框含「笔记本身不会被删除」）；标签页列出 + 计数；笔记页有项目/标签筛选、卡片显示项目与标签、标签 AND 只剩 1 条、清除筛选恢复 3 条；表单回填项目与标签、打开不误报未保存、改标签后保存成功且后端确认 2 个标签；375 项目页与笔记页均无横向滚动 |
+| 落库（SQL 直查） | **一条笔记多个项目的行数 = 0**（R4 兜底）；孤儿关联（指向已删笔记/标签）= 0（删笔记会清 `note_tag`）；指向已逻辑删除标签的关联 = 0 |
+
+**③ 🔴 实测踩到的 3 个坑（都已处理）**
+
+1. **`updateById` 忽略 null → 颜色永远清不掉**：改色走实体更新时 `null` 会被跳过。
+   → 改用 wrapper 显式 `.set(Tag::getColor, null)`（与「置顶不刷 updated_at」同一类坑：想写 null 必须走 wrapper）。
+2. **`MetaObjectHandler` 对新实体是地雷**：`note_tag` 两个字段都没有、`tag` 没有 `updated_at`，
+   而填充器原来无条件 `strictInsertFill`（T1 曾因「实体没有属性」抛过异常）。
+   → 填充逻辑改成**有 setter 才填**，新增实体不必回头改配置。
+3. **验证脚本假失败：拿已被删掉的标签做计数断言**。第一版「删除笔记后标签计数回落」用了前面用例已删除的
+   `tagY` → 取不到对象、`before=undefined`。→ 换一个新标签重新验证。**断言的数据前提也要复查**。
+
+**④ 测试数据与进程收尾**
+
+| 项 | 结果 |
+| :--- | :--- |
+| 测试账号 `13900000001` | 已硬删；`user` 表 **1 行**（用户真账号，未动） |
+| `note` / `tag` / `note_tag` / `attachment` | 全 **0** 行 |
+| Redis `pkb:*` | **0** 个 key |
+| 归档库 `osc.user` | 仍 **93** |
+| 隔离栈 8090 / 5180 | 已停、端口已释放 |
+| 用户自己的 8080 / 5173 | **全程未动**（交付时探活发现**本来就没在跑**，见下） |
+
+**⑤ 遗留 / 待人工**
+
+- 用户的 8080 / 5173 在本次交付时**未运行**（机器应是重启过；MySQL / Redis 是自启服务，均正常）。
+  → 手动验收前请按交接文档「八」先起后端与前端，**后端务必是新代码**（T8 新增了 `/tag` 接口，旧进程会 40400）。
+- 标签很多（>50）时的多选体验只做了 `filterable`，**未压测**（PRD P-007 只要求「可用、不撑破布局」，已满足）。
+
+#### T8 验证指引（PowerShell 5.1 友好）
+
+```powershell
+$root = "F:\Project\Own Project\Personal-Knowledge-Base"
+$mysql = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
+
+# ---------- 1. 只读核对：接口与关联兜底都在 ----------
+Select-String -Path "$root\server\src\main\java\com\pkb\controller\TagController.java" -Pattern '@(Get|Post|Put|Delete)Mapping'
+# 期望 5 行（GET / POST / PUT /{id} / PUT /sort / DELETE /{id}）
+Select-String -Path "$root\server\src\main\java\com\pkb\service\impl\NoteServiceImpl.java" -Pattern 'applyAssociations'
+# 期望：定义 1 处 + 调用 2 处（create / update）
+
+# ---------- 2. 起隔离栈（先确认 8090 空闲）----------
+Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+cd "$root\server"
+Remove-Item env:SERVER__PORT -ErrorAction SilentlyContinue
+Remove-Item env:SERVER__HOST -ErrorAction SilentlyContinue
+& "E:\MAVEN\apache-maven-3.6.3\bin\mvn.cmd" -B package -DskipTests -q
+if ($LASTEXITCODE -ne 0) { throw "后端构建失败" }
+Start-Process -FilePath "C:\Program Files\Java\jdk-17\bin\java.exe" `
+  -ArgumentList '-jar','target\pkb-server-1.0.0.jar','--server.port=8090' `
+  -WorkingDirectory "$root\server" -WindowStyle Hidden
+cd "$root\web"; npm run build; if ($LASTEXITCODE -ne 0) { throw "前端构建失败" }
+cd "$root\.workbuddy\skills\pkb-verify"
+Start-Process -FilePath "node.exe" -ArgumentList "scripts\preview_server.cjs" -WindowStyle Hidden
+
+# ---------- 3. 跑 T8 两条（夹具账号见交接文档 §9.1 第 ① 步）----------
+$env:PKB_API_BASE = "http://127.0.0.1:8090"
+$env:PKB_PREVIEW_ORIGIN = "http://127.0.0.1:5180"
+node .\scripts\t8_api_verify.cjs    # 57 项
+node .\scripts\t8_page_verify.cjs   # 27 项（截图落在 .workbuddy\verify\t8\）
+
+# ---------- 4. 落库核对（项目单选兜底的关键断言）----------
+& $mysql --user=root --password=root --skip-column-names "--execute=USE pkb; SELECT COUNT(*) FROM (SELECT nt.note_id FROM note_tag nt JOIN tag t ON t.id=nt.tag_id AND t.type=1 AND t.is_deleted=0 GROUP BY nt.note_id HAVING COUNT(*)>1) x;"
+# 期望 0（一条笔记最多一个项目）
+& $mysql --user=root --password=root --skip-column-names "--execute=USE pkb; SELECT COUNT(*) FROM note_tag nt LEFT JOIN note n ON n.id=nt.note_id AND n.is_deleted=0 LEFT JOIN tag t ON t.id=nt.tag_id AND t.is_deleted=0 WHERE n.id IS NULL OR t.id IS NULL;"
+# 期望 0（没有孤儿关联）
+
+# ---------- 5. 收尾 ----------
+& $mysql --user=root --password=root "--execute=USE pkb; DELETE FROM note_tag; DELETE FROM note; DELETE FROM tag; DELETE FROM user WHERE phone='13900000001';"
+Get-NetTCPConnection -LocalPort 8090,5180 -State Listen -ErrorAction SilentlyContinue |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+```
 
 ---
 
@@ -1814,6 +1938,12 @@ Get-NetTCPConnection -LocalPort 8090,5180 -State Listen -ErrorAction SilentlyCon
 | D48 | **富文本工具栏白名单化（只留「保存后仍存活」的菜单）** | jsoup 的 `style` 白名单只放行 `text-align / text-indent / color / background-color`，`class`/`id` 一律剥。默认工具栏的「字号/字体/行高/缩进/波浪线/着重号/格式刷」产生的正是被剥掉的样式 → **编辑时看到、保存后消失**（违反 NFR「绝不允许以为存了其实没存」）。故 `RichTextEditor` 用 `toolbarKeys` 显式收窄为 21 项 | T7 |
 | D49 | **编辑器的「初始化规范化」不算用户编辑** | wangEditor 初始化会把入库 HTML 按 Slate 重新序列化（且空内容给 `<p><br></p>`，是非空字符串）→ 直接当输入会「一打开就显示有未保存的修改」、并污染空表单。故：① 编辑器创建后 250ms **静默期**，期间不 emit `update:modelValue`；② 静默结束把「编辑器认下来的 HTML」经 `normalize` 事件交给表单**重置基线**；③ 空 HTML（仅有空段落/换行，且无 `img`）归一成 `''`；④ 格式选择用**单向绑定**（`:model-value` + `@update:model-value`），否则 `v-model` 会在 `@change` 前就换掉编辑器、确认框形同虚设 | T7 |
 | D50 | **验证脚本两条硬规矩** | ① 页面表达式（模板字符串）里的**注释禁止出现反引号** —— 会提前截断模板字符串，Node 侧报 `content is not defined`；② 脚本的 `.catch` 必须 `chrome.kill()` + `process.exit()`，只设 `exitCode` 会让 Chrome 子进程与 WebSocket 吊住事件循环 → **表现为「假死、零输出」**（2026-10-17 实际卡掉一轮，见交接文档 §四 T7 坑） | 通用 |
+| D51 | **项目 / 标签关联用「全量替换」，且与正文同事务提交** | 请求体带可选 `associations{projectId, tagIds}`：**带了这个对象就以它为准**（`projectId=null` 清空项目、`tagIds=[]` 清空标签），**不带则完全不动关联**（T5/T6 老调用方不受影响）。服务端先清空该笔记在 `note_tag` 的全部行再重建 —— 「一条笔记最多一个项目」（铁律②）因此在**写入路径上结构成立**，不存在「新增第二个项目」的代码路径。关联与正文在同一个 `@Transactional` 里，避免「正文存了、标签没存」的半边成功 | T8 |
+| D52 | **计数口径 = 全部状态（含待整理），一次分组查询** | `noteCount` = 该标签关联的**未删除**笔记数，**不区分 status**（PRD #12 于 2026-10-19 拍板）。管理页与删除确认用的是同一个数，所以「卡片显示 2 条 → 删除提示影响 2 条」自洽。实现用 `GROUP BY tag_id` 一次拿全表，禁止逐条 COUNT（N+1）；已逻辑删除的笔记通过 `JOIN note ... is_deleted=0` 排除 | T8 |
+| D53 | **排序用「整组 id 提交」，服务端重写 0,10,20…** | `PUT /tag/sort` 传该类型下**全部** id 的目标顺序；服务端校验「数量与内容都一致」后按 `index*10` 重写。理由：两两交换 sort 在重复点击 / 并发下容易撞成同值，重排结果不可预期；整组提交是确定的。新建默认 `max(sort)+10`，排到末尾。前端用**上移/下移**按钮，不引拖拽库 | T8 |
+| D54 | **清空类更新必须走 wrapper 显式 set** | `updateById` 会忽略 null 字段 → 「把颜色清空」永远清不掉。改色 / 清色一律 `Wrappers.lambdaUpdate().set(Tag::getColor, …)`。与 D38「置顶/归档显式写回 updated_at」是同一类坑：**想写 null 或想写回原值，都不能走实体更新** | T8 |
+| D55 | **列表筛选先算候选 note_id 集合，不写 join** | 项目单选与标签多选都先由 `note_tag` 算出候选 id：标签 **AND** 用 `GROUP BY note_id HAVING COUNT(DISTINCT tag_id)=N`，项目用单标签查询；多条件时取交集，最后 `IN` 收窄。理由：自定义 join 与 MyBatis-Plus 分页 / `@TableLogic` / `is_deleted=0` 叠加后极易出错，而个人数据量下多一次聚合查询的代价可以忽略。空集合直接返回空页（不查主表） | T8 / T10 |
+| D56 | **`MetaObjectHandler` 一律「有 setter 才填」** | T8 新增的 `note_tag` 两个字段都没有、`tag` 没有 `updated_at`；原来的无条件 `strictInsertFill` 是 T1 踩过的雷（实体没有属性会抛异常）。填充前统一 `metaObject.hasSetter(...)` 判断，新增实体不必回头改配置 | T8 |
 
 ---
 
